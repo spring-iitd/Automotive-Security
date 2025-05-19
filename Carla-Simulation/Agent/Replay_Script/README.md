@@ -1,6 +1,6 @@
 # Traffic Generation and Replay in CARLA
 
-This project provides a setup to generate and replay autonomous driving traffic using CARLA. It uses behavior agents to simulate realistic driving behavior and ensures reproducible traffic patterns through timestamp-based replay.
+This provides a setup to generate and replay autonomous driving traffic using CARLA. It uses behavior agents to simulate realistic driving behavior and ensures reproducible traffic patterns through timestamp-based replay.
 
 ## Overview
 

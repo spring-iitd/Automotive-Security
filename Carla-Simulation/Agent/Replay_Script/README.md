@@ -20,10 +20,10 @@ The workflow is automated using the `generate_replay_agent.sh` script, which per
 
 ## Limitation
 
-- **the Euclidean distance between the two vehicles is not identically replicated**.
+- **Euclidean distance between the two vehicles is not identically replicated**.
 ## Usage
 
 To run the full simulation and replay:
 
 ```bash
-bash generate_replay_agent.sh
+generate_replay_agent.sh

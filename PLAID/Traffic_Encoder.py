@@ -750,16 +750,16 @@ def modify_and_copy_images_labels(combined_folder,combined_label_file,label_file
 
 def main():
     
-    json_file_path = 'DoS_S.json'
+    json_file_path = 'carla_T.json'
     # # 1) Load the JSON file
     data_array, frame_type, anchor = load_json(json_file_path)
     print("json loaded")
     
-    base_output_folder= 'DoS_S_images'
-    label_file = 'dos_t.txt'
+    base_output_folder= 'carla_T_images'
+    label_file = 'labels.txt'
     # 2) Formation of Images
-    binary_matrix, y1, stats, anchor_1, anchor_2, anchor_3, anchor_4 = make_image_array(data_array, frame_type, anchor, data_rate=500000) 
-    image_generation(binary_matrix, y1,base_output_folder,label_file)
+    # binary_matrix, y1, stats, anchor_1, anchor_2, anchor_3, anchor_4 = make_image_array(data_array, frame_type, anchor, data_rate=500000) 
+    # image_generation(binary_matrix, y1,base_output_folder,label_file)
 
     # # 3) Define paths
     # src_folder = './DoS_S_images'  # Path to the source folder with images

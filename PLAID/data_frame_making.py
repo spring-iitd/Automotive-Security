@@ -581,7 +581,7 @@ def CARLA_form_data(input_filename):
     frame_type = []
 
     # Arbitration ID to identify anchor frames
-    can_arb_id = '017C'
+    can_arb_id = '017c'
 
     #binary string size of each data frame
     frame_size = []
@@ -627,6 +627,7 @@ def main():
     input_filename = "./Dataset/DoS_dataset.csv"
     # input_filename = "./Dataset/Fuzzy_dataset.csv"
     # input_filename = "./Dataset/gear_dataset.csv"
+    input_filename = "carla/merged.csv"
 
     output_path = "./Dataset/DoS_dataset_pp.csv"
     # output_path = "./Dataset/Fuzzy_dataset_pp.csv"
@@ -653,20 +654,20 @@ def main():
     # pre_process_attack_data(input_filename,output_path)
 
     #split in 2 sections.
-    split_csv("Dataset/DoS_dataset_pp.csv", "Dataset/DoS_dataset_S.csv", "Dataset/DoS_dataset_T.csv")
+ #   split_csv("Dataset/DoS_dataset_pp.csv", "Dataset/DoS_dataset_S.csv", "Dataset/DoS_dataset_T.csv")
     # split_csv("Dataset/Fuzzy_dataset_pp.csv", "Dataset/Fuzzy_dataset_S.csv", "Dataset/Fuzzy_dataset_T.csv")
     # split_csv("Dataset/gear_dataset_pp.csv", "Dataset/gear_dataset_S.csv", "Dataset/gear_dataset_T.csv")
     
     
 
     # # Calling the form_data function to process the input file and obtain data arrays
-    data_array, frame_type, anchor, frame_size = CH_form_data("Dataset/gear_dataset_T.csv")
+    # data_array, frame_type, anchor, frame_size = CH_form_data("Dataset/gear_dataset_T.csv")
     # # data_array, frame_type, anchor, frame_size = OTIDS_form_data(input_filename)
     # # data_array, frame_type, anchor, frame_size = MIRGU_form_data(input_filename)
-    # # data_array, frame_type, anchor, frame_size = CARLA_form_data(input_filename)
+    data_array, frame_type, anchor, frame_size = CARLA_form_data(input_filename)
     
     # Saving data to a JSON file
-    with open(r"gear_T.json", "w") as json_file:
+    with open(r"carla_T.json", "w") as json_file:
         # Write the data arrays and anchor list to the JSON file
         json.dump({"data_array": data_array, "frame_type": frame_type, "anchor": anchor}, json_file)
 

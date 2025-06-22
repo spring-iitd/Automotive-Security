@@ -167,7 +167,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                         x = 0
                         y = 0
 
-                        i += 1
+                        # i += 1
                         break
 
             # Adding row completion bits to start the next frame in a new row
@@ -203,7 +203,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                     y = 0
                     break
                 y += 1
-            i += 1
+            # i += 1
 
         # 31<row<63
         elif bin_str in anchor and (x>(int(img_fraction*1) and x < (int(img_fraction*2)))):
@@ -266,7 +266,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                         x = 0
                         y = 0
 
-                        i += 1
+                        # i += 1
                         break
 
             # Adding row completion bits to start the next frame in a new row
@@ -302,7 +302,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                     y = 0
                     break
                 y += 1
-            i += 1
+            # i += 1
 
         # 63<row<95
         elif bin_str in anchor and (x>(int(img_fraction*2) and x < (int(img_fraction*3)))):
@@ -365,7 +365,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                         x = 0
                         y = 0
 
-                        i += 1
+                        # i += 1
                         break
 
             # Adding row completion bits to start the next frame in a new row
@@ -401,7 +401,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                     y = 0
                     break
                 y += 1
-            i += 1
+            # i += 1
 
         # 95<row<127
         elif bin_str in anchor and (x>(int(img_fraction*3) and x < (int(img_fraction*4)))):
@@ -482,7 +482,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                         break
                     else:
                         y += 1
-            i += 1
+            # i += 1
 
 
         # Frame is not an anchor frame
@@ -525,7 +525,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                     x = 0
                     y = 0
 
-                    i += 1
+                    # i += 1
                     break
 
             # Check if there are more frames
@@ -567,7 +567,7 @@ def make_image_array(data_array, frame_type, anchor, data_rate):
                         x = 0
                         y = 0
 
-                        i += 1
+                        # i += 1
                         break
 
             # Adding row completion bits to start the next frame in a new row

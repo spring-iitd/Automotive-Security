@@ -2,13 +2,14 @@ import os
 
 from get_ids import get_model
 
-def train_model(TrainSplit, modelName, modelPath):
-    X_train, Y_train = TrainSplit.drop(columns = ['flag', 'timestamp']).values, TrainSplit['flag'].values
-    
+def train_model(modelName, modelPath, adv_attack):
+    if(adv_attack):
+        return 
+
     model = get_model(modelName)
     
     print("Starting Training")
-    model.train(X_train, Y_train)
+    model.train()
     print("Training Completed")
 
     model.save(modelPath)

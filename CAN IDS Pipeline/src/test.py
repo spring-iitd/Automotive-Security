@@ -2,20 +2,13 @@ import os
 from sklearn.preprocessing import StandardScaler
 
 from get_ids import get_model
+import train_test_split
 
-def test_model(TestSplit, modelName, modelPath):
-    X_test, Y_test = TestSplit.drop(columns = ['flag', 'timestamp']).values, TestSplit['flag'].values
-    
-    scaler = StandardScaler()
-    scaler.fit(X_test)
-
-    # Transform train and test sets
-    X_test = scaler.transform(X_test)
-
+def test_model(modelName, modelPath, adv_attack,image = None, TestSplit = None ):
+    if(adv_attack):
+        return 
     model = get_model(modelName)
     print(f"Loading model from {os.path.normpath(modelPath)}")
-    model.load(modelPath)
-    
-    print("Test Accuracy: ", model.test(X_test, Y_test))
-
+    model.load(modelPath)    
+    print("Test Accuracy: ", model.test())
     print("Testing Completed")

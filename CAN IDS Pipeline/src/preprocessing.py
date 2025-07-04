@@ -6,7 +6,10 @@ from utilities import *
 from base_preprocessor import DataPreprocessor  
 
 
-def preprocess(dataset_path):
+def preprocess(dataset_path, preprocess):
+    if(not preprocess):
+        return
+    print("Started Pre-processing")
     preprocess_file_path = os.path.join(dataset_path, 'preprocess_dataset.py')    
     if not os.path.exists(preprocess_file_path):
         print("No preprocessing script found.")

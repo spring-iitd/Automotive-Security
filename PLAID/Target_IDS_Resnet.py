@@ -189,7 +189,7 @@ def load_dataset(data_dir, label_file, is_train):
 
 
 
-def train_wisa(model, device, train_loader, optimizer, criterion, epoch):
+def train_wisa(model, device, train_loader, optimizer, criterion, epoch,save_model):
     model.train()
     correct = 0
     total = 0
@@ -217,7 +217,9 @@ def train_wisa(model, device, train_loader, optimizer, criterion, epoch):
                   f"Loss: {loss.item():.6f} Accuracy: {accuracy:.2f}%")
     
     print("Training complete!")
-    torch.save(model.state_dict(), './Trained_Models/wisa_with_surrdata.pth')
+    torch.save(model.state_dict(), f'./Trained_Models/{save_model}.pth')
+
+    # torch.save(model.state_dict(), './Trained_Models/wisa_with_surrdata.pth')
 
     # Print overall training loss and accuracy for the epoch
     overall_accuracy = 100. * correct / len(train_loader.dataset)
@@ -226,9 +228,10 @@ def train_wisa(model, device, train_loader, optimizer, criterion, epoch):
     
 
 
-def test_wisa(model, device, test_loader, criterion):
+def test_wisa(model, device, test_loader, criterion,save_model):
 
-    model.load_state_dict(torch.load('./Trained_Models/dos_spoof_wisa.pth', weights_only='True'))
+    # model.load_state_dict(torch.load('./Trained_Models/dos_spoof_wisa.pth', weights_only='True'))
+    model.load_state_dict(torch.load(f'./Trained_Models/{save_model}.pth', weights_only='True'))
     model.eval()
     test_loss = 0
     correct = 0
@@ -333,9 +336,16 @@ def main():
     # Define your dataset directories
     # train_dataset_dirs = '/home/ipali/scratch/code/PLAID-main/Surrogate_dataset_old/combined_folder_DoS_spoof'  # Add the paths to your other training directories
     # train_label_files = '/home/ipali/scratch/code/PLAID-main/Surrogate_dataset_old/combined_folder_DoS_spoof/combined_labels_dos_spoof.txt'
-    
-    test_dataset_dirs = '/home/ipali/scratch/code/PLAID-main/Surrogate_dataset_old/combined_folder_DoS_spoof_test' # Same for test directories
-    test_label_files = '/home/ipali/scratch/code/PLAID-main/Surrogate_dataset_old/combined_folder_DoS_spoof_test/combined_labels_dos_spoof_test.txt'
+   
+    train_dataset_dirs = '/home/ipali/scratch/code/PLAID-main/carla_T_images'  # Add the paths to your other training directories
+    train_label_files = '/home/ipali/scratch/code/PLAID-main/carla_T_images/carla_labels.txt'
+
+    ###CHECK THIS IF THE WISA MODEL IS TRAINED WITH SURROGATE DATASET OR TARGET DATASET!!!!!!!    - Surrogate because it was giving better results on attack
+    #-----------------------------------------------------------------------------------------#
+
+
+    test_dataset_dirs = '/home/ipali/scratch/code/PLAID-main/carla_T_images' # Same for test directories
+    test_label_files = '/home/ipali/scratch/code/PLAID-main/carla_T_images/carla_test_labels.txt'
     
     # #creating label file for perturbed images 
     # input_file = '/home/ipali/scratch/code/PLAID-main/Target_dataset_new/test/test_gear_T_images/gear_test.txt'
@@ -347,14 +357,14 @@ def main():
 
     #folder and filename to save results
     folder = '/home/ipali/scratch/code/PLAID-main/CF_Results/'
-    filename = 'Target_IDS.png'
-
+    filename = 'Target_IDS_carla.png'
+    save_model = 'wisa_carla'
     # Set up the device (GPU or CPU)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Load the test and train datasets from multiple folders
-    # train_loader = load_dataset(train_dataset_dirs, train_label_files,is_train=True)
-    # print("Loaded train dataset")
+    train_loader = load_dataset(train_dataset_dirs, train_label_files,is_train=True)
+    print("Loaded train dataset")
 
     test_loader = load_dataset(test_dataset_dirs, test_label_files,is_train=False)
     print("Loaded test dataset")
@@ -362,8 +372,8 @@ def main():
     model = InceptionResNetV1(num_classes=2).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
     criterion = nn.CrossEntropyLoss()
-    # train_wisa(model, device, train_loader, optimizer, criterion, 200)
-    all_preds, all_labels = test_wisa(model, device, test_loader, criterion)
+    train_wisa(model, device, train_loader, optimizer, criterion, 100,save_model)
+    all_preds, all_labels = test_wisa(model, device, test_loader, criterion,save_model)
     
     tnr, mdr, oa_asr, IDS_accu, IDS_prec, IDS_recall,IDS_F1 = evaluation_metrics(all_preds, all_labels,folder,filename)
 

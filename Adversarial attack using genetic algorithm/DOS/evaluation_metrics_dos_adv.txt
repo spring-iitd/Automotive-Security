@@ -1,0 +1,19 @@
+Confusion Matrix:
+[[30  0]
+ [68  2]]
+
+False Negative Rate (FNR): 0.9714
+Error Rate (ER): 0.6800
+Precision: 1.0000
+Recall: 0.0286
+F1 Score: 0.0556
+
+Classification Report:
+              precision    recall  f1-score   support
+
+      Normal       0.31      1.00      0.47        30
+      Attack       1.00      0.03      0.06        70
+
+    accuracy                           0.32       100
+   macro avg       0.65      0.51      0.26       100
+weighted avg       0.79      0.32      0.18       100

@@ -196,8 +196,9 @@ def convert_to_binary_string(can_id, dlc, data):
     # print(data_bits)
     # Filling missing data bytes with zeros
     padding_bits = '0' * (8 * (8 - dlc))
-    data_bit_total = data_bits + padding_bits
- 
+    # data_bit_total = data_bits + padding_bits
+    data_bit_total = padding_bits + data_bits 
+
     # Calculating CRC-15 checksum and converting to binary representation
     crc_bit = bin(calculate_crc(start_of_frame + can_id_bits + rtr_bit + ide_bit + control_r0_bit +
                                 dlc_bits + data_bit_total))[2:].zfill(15)

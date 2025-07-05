@@ -2327,7 +2327,7 @@ def Attack_procedure(model, test_model, device, test_loader, injection_type, mod
     
 for_Carla = False
 
-def main():
+def whiteBoxAttack():
     
     '''
     #steps to run:

@@ -96,7 +96,9 @@ def process_image(image_path, initial_timestamp=0):
         dlc = int(binary_string[15:19], 2)
         # print("dlc",dlc)
         # data_bytes = [hex(int(binary_string[19 + i*8:28 + i*8], 2))[2:].zfill(2) for i in range(dlc)]
-        data_bits = binary_string[19:19 + dlc * 8]
+        # data_bits = binary_string[19:19 + dlc * 8]
+        start_bit = 19+ (8 - dlc)*8 
+        data_bits = binary_string[start_bit:start_bit + (dlc * 8)]
         data_bytes = [hex(int(data_bits[i:i+8], 2))[2:].zfill(2) for i in range(0, len(data_bits), 8)]
  
         # print("data",data_bytes)

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the start and end values for the range
-start_value=35.5
-end_value=35.5
+start_value=25.5
+end_value=25.5
 step=0.00625
 diff=0.006
 
@@ -33,8 +33,8 @@ for i in "${!lower_values[@]}"; do
     echo ""
     
     # Define new directory names
-    logs_dir="./Logs_${lower}_2"
-    graphs_dir="./Graphs_${lower}_2"
+    logs_dir="./Logs_${lower}_1"
+    graphs_dir="./Graphs_${lower}_1"
     
     # Create directories if they don't exist
     mkdir -p "$logs_dir" "$graphs_dir"

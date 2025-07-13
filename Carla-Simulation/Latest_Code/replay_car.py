@@ -228,6 +228,33 @@ class CAN_Data_Logger(object):
             action()
             add_delay(0.000200) #150 microseconds
 
+    def parse_logs(self, steer_msg, throttle_brake_msg):
+        steer = 0.0
+        can_id = steer_msg.arbitration_id
+
+        if can_id == self.steer_message.frame_id:
+            steer_data = self.steer_message.decode(steer_msg.data)
+            steer = steer_data['STEER_ANGLE']
+        
+        throttle, brake = 0.0, 0.0
+        can_id = throttle_brake_msg.arbitration_id
+
+        if can_id == self.throttle_brake_message.frame_id:
+            throttle_brake_data = self.throttle_brake_message.decode(throttle_brake_msg.data)
+            throttle = throttle_brake_data['PEDAL_GAS']
+            brake = throttle_brake_data['BRAKE_PRESSED']
+
+        gear = 0        
+
+        return throttle, steer, brake, False, False, False, gear
+    
+    def convert_to_CAN_msg(self, line):
+        # print(line)
+        can_id = line.split()[2]
+        can_data = line.split("[8]")[1].replace(" ", "")
+        can_msg = can.Message(arbitration_id=int(can_id, 16), data=bytearray.fromhex(can_data))
+        return can_msg
+
     def __del__(self):
         self.bus.shutdown()
         pass
@@ -322,7 +349,73 @@ def modify_vehicle_physics(actor):
     except Exception as e:
         print(f"[WARN] Failed to modify physics for actor {actor.id}: {e}")
 
-def generate_dos_data_two_car():
+def read_jitter_array(file_path):
+    jitter_array = []
+    try:
+        with open(file_path, 'r') as file:
+            for line in file:
+                line = line.strip()
+                if line:  # Check if the line is not empty
+                    jitter_value = float(line)
+                    jitter_array.append(jitter_value)
+    except FileNotFoundError:
+        print(f"[ERROR] Jitter array file not found: {file_path}")
+    except ValueError as e:
+        print(f"[ERROR] Invalid value in jitter array file: {e}")
+    return jitter_array
+
+def convert_can_to_control_data(file_path):
+    control_obj = []
+    can_logger = CAN_Data_Logger()
+    
+    current_group = {'14A': None, '17C': None}
+
+    def add_control_obj():
+        steer_msg = current_group['14A']
+        throttle_msg = current_group['17C']
+        
+        throttle, steer, brake, _, _, _, gear = can_logger.parse_logs(steer_msg, throttle_msg)
+        
+        control_obj.append(carla.VehicleControl(
+            throttle=throttle,
+            steer=steer,
+            brake=brake,
+            gear=gear
+        ))
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            msg = can_logger.convert_to_CAN_msg(line)
+            can_id = msg.arbitration_id
+
+            if can_id == 0x14A:
+                current_group['14A'] = msg
+
+            elif can_id == 0x17C:
+                current_group['17C'] = msg
+
+            # If all two messages are present, process
+            if all(current_group.values()):
+                add_control_obj()
+                current_group = {'14A': None, '17C': None}
+
+    return control_obj
+
+def extract_control_data(file_path):
+    control_obj = []
+    pattern = re.compile(r"throttle=([\d\.\-]+), steer=([\d\.\-]+), brake=([\d\.\-]+).*gear=(\d+)")
+    
+    # Read the log file and extract control data
+    with open(file_path, "r") as file:
+        for line in file:
+            match = pattern.search(line)
+            if match:
+                throttle, steer, brake, gear = match.groups()
+                control_obj.append(carla.VehicleControl(throttle=float(throttle), steer=float(steer), brake=float(brake), gear=int(gear)))
+    
+    return control_obj
+
+def replay_dos_data_two_car():
     # Initialize CARLA client
     client = carla.Client('localhost', 2000)
     client.set_timeout(10.0)
@@ -368,23 +461,27 @@ def generate_dos_data_two_car():
     agent_2.set_destination(destination)
 
     # Open log files
-    vehicle_location_writer_1 = open('./Logs_25.5_1/gen_coord_1.log', 'w')
-    vehicle_control_writer_1 = open("./Logs_25.5_1/gen_control_obj_1.log", "w")
+    vehicle_location_writer_1 = open('./Logs_Replay/gen_coord_1.log', 'w')
+    vehicle_control_writer_1 = open("./Logs_Replay/gen_control_obj_1.log", "w")
 
-    vehicle_location_writer_2 = open('./Logs_25.5_1/gen_coord_2.log', 'w')
-    vehicle_control_writer_2 = open("./Logs_25.5_1/gen_control_obj_2.log", "w")
+    vehicle_location_writer_2 = open('./Logs_Replay/gen_coord_2.log', 'w')
+    vehicle_control_writer_2 = open("./Logs_Replay/gen_control_obj_2.log", "w")
 
-    timestamp_writer = open('./Logs_25.5_1/gen_timestamps.log', 'w')
-    dos_timestamp_writer = open('./Logs_25.5_1/dos_timestamp.log', 'w')
-    jitter_array_writer = open('./Logs_25.5_1/jitter_array.log', 'w')
+    timestamp_writer = open('./Logs_Replay/gen_timestamps.log', 'w')
+    dos_timestamp_writer = open('./Logs_Replay/dos_timestamp.log', 'w')
+
+    timestamp_reader = open('./Logs_25.5_1/gen_timestamps.log', 'r')
 
     # Initialize lists to store data
-    vehicle_control_obj_1 = []
-    vehicle_control_obj_2 = []
+    vehicle_control_obj_1 = convert_can_to_control_data('./Logs_25.5_1/can_data_logs.log')
+    vehicle_control_obj_2 = extract_control_data('./Logs_25.5_1/gen_control_obj_2.log')
     timestamps = []
     vehicle_location_1 = []
     vehicle_location_2 = []
     dos_timestamp = []
+
+    # Read timestamps from the generated log file
+    gen_timestamps = [float(line.strip()) for line in timestamp_reader if line.strip()]
 
     # Initialize CAN data logger
     can_handler = CAN_Data_Logger()
@@ -394,12 +491,11 @@ def generate_dos_data_two_car():
     sim_time_sec = 36 # Duration of simulation in seconds
     total_iterations = int(sim_time_sec / time_diff_tick)
 
-    jitter_array = generate_jitter_array(0,100,(total_iterations+1000)*14)
+    jitter_array = read_jitter_array('./Logs_25.5_1/jitter_array.log') 
 
     dos_mode = False
     count_dos = 0
-    num_dos_msgs = random.randint(0, 100)  # Number of DoS messages to inject
-    # num_dos_msgs = 300
+    num_dos_msgs = 95 # Number of DoS messages to inject
     print(f"Number of DoS messages to inject: {num_dos_msgs}")
     skipped_control_objects = queue.Queue()
 
@@ -407,12 +503,14 @@ def generate_dos_data_two_car():
     start_time = timeit.default_timer()
     can_handler.start_frame()
     try:
-        for i in range(total_iterations):  
+        for i in range(len(vehicle_control_obj_1)):  
 
             # Get current time
             current_time = timeit.default_timer() - start_time
 
-            # print(str(current_time))
+            while current_time < gen_timestamps[i]:
+                current_time = timeit.default_timer() - start_time
+
             timestamps.append(current_time)
 
             world.tick()
@@ -447,9 +545,9 @@ def generate_dos_data_two_car():
 
                 count_dos = 0
 
-            # Get current control state
-            control_1 = agent_1.run_step()
-            control_2 = agent_2.run_step()
+            # # Get current control state
+            control_1 = vehicle_control_obj_1[i]
+            control_2 = vehicle_control_obj_2[i]
 
             current_location_1 = vehicle_1.get_location()
             current_location_2 = vehicle_2.get_location()
@@ -504,11 +602,6 @@ def generate_dos_data_two_car():
             vehicle_location_1.append(current_location_1)
             vehicle_location_2.append(current_location_2)
 
-            delay_time = current_time + time_diff_tick
-            current_time = timeit.default_timer() - start_time
-            while current_time < delay_time:
-                current_time = timeit.default_timer() - start_time
-
     finally:
         
         print("Terminating simulation...")
@@ -546,15 +639,11 @@ def generate_dos_data_two_car():
                 dos_timestamp_writer.write(str(ele)[:12] + '\n')
         dos_timestamp_writer.close()
 
-        for ele in jitter_array:
-            jitter_array_writer.write(str(ele) + '\n')
-        jitter_array_writer.close()
-
-        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_25.5_1/plot_throttle_time_1.png", "./Graphs_25.5_1/plot_steer_time_1.png", "./Graphs_25.5_1/plot_brake_time_1.png")
-        plot_diff(timestamps, "./Graphs_25.5_1/plot_timestamp_diff_gen.png")
-        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_25.5_1/plot_euclid_diff_gen_index.png', 0, total_iterations)
-        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_25.5_1/gen_coord_1.log", "./Graphs_25.5_1/benign_vs_attack_path.png", 0, total_iterations)
-        plot_benign_timeline_near_dos(timestamps, dos_timestamp, './Graphs_25.5_1/plot_dos_timeline.png')
+        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_Replay/plot_throttle_time_1.png", "./Graphs_Replay/plot_steer_time_1.png", "./Graphs_Replay/plot_brake_time_1.png")
+        plot_diff(timestamps, "./Graphs_Replay/plot_timestamp_diff_gen.png")
+        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_Replay/plot_euclid_diff_gen_index.png', 0, total_iterations)
+        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_Replay/gen_coord_1.log", "./Graphs_Replay/benign_vs_attack_path.png", 0, total_iterations)
+        plot_benign_timeline_near_dos(timestamps, dos_timestamp, './Graphs_Replay/plot_dos_timeline.png')
 
         # Rest simulation settings
         settings.synchronous_mode = False
@@ -567,4 +656,4 @@ def generate_dos_data_two_car():
 
 if __name__ == '__main__':
     print("Starting generation...")
-    generate_dos_data_two_car()
+    replay_dos_data_two_car()

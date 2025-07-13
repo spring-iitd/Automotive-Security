@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Define the start and end values for the range
-start_value=23.0
-end_value=24.0
+start_value=35.5
+end_value=35.5
 step=0.00625
-diff=0.004
+diff=0.006
 
 # Generate lower values dynamically from 22.5 to 26.5 with a step of 0.1
 lower_values=()

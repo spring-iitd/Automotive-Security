@@ -1,6 +1,3 @@
-"""
-    This script generates a Denial of Service (DoS) attack scenario in CARLA with two vehicles.
-"""
 import glob
 import os
 import queue
@@ -20,7 +17,7 @@ from plot_graphs import plot_benign_timeline_near_dos, plot_diff, plot_euclid_di
 # -- Find CARLA module ---------------------------------------------------------
 # ==============================================================================
 try:
-    sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
+    sys.path.append(glob.glob('../../../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
@@ -31,7 +28,7 @@ except IndexError:
 # -- Add PythonAPI for release mode --------------------------------------------
 # ==============================================================================
 try:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/carla')
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) + '/carla')
 except IndexError:
     pass
 
@@ -146,6 +143,11 @@ class CAN_Data_Logger(object):
         message = can.Message(arbitration_id=0x00000000, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
 
+    def start_frame(self):
+        # To do DoS with different arbitration IDs, you can modify the arbitration_id and data fields of the message. 
+        message = can.Message(arbitration_id=0x1FFFFFFF, data=[0x00] * 8, is_extended_id=True)
+        self.bus.send(message)
+
     def log_dummy_data_1(self):
         data=[0x00] * 8
         data[0] = random.randint(0, 255)
@@ -198,9 +200,9 @@ class CAN_Data_Logger(object):
             ("dummy_1", lambda: self.log_dummy_data_1(), 0.0),  # every tick
             ("dummy_2", lambda: self.log_dummy_data_2(), 0.25),
             ("dummy_3", lambda: self.log_dummy_data_3(), 0.5),
-            ("dummy_4", lambda: self.log_dummy_data_4(), 0.75),
-            ("dummy_5", lambda: self.log_dummy_data_5(), 1.0),
-            ("dummy_6", lambda: self.log_dummy_data_6(), 2.0),
+            # ("dummy_4", lambda: self.log_dummy_data_4(), 0.75),
+            # ("dummy_5", lambda: self.log_dummy_data_5(), 1.0),
+            # ("dummy_6", lambda: self.log_dummy_data_6(), 2.0),
             # Example: Add a new message here with 500ms periodicity:
             # ("my_new_msg", lambda: self.log_new_data(data), 0.5),
         ]
@@ -224,7 +226,7 @@ class CAN_Data_Logger(object):
         sorted_actions = sorted(eligible_actions, key=lambda x: x[0])
         for _, action in sorted_actions:
             action()
-            add_delay(0.000150) #150 microseconds
+            add_delay(0.000200) #150 microseconds
 
     def __del__(self):
         self.bus.shutdown()
@@ -350,7 +352,7 @@ def generate_dos_data_two_car():
     # Configure synchronous simulation
     settings = world.get_settings()
     settings.synchronous_mode = True
-    settings.fixed_delta_seconds = 0.006
+    settings.fixed_delta_seconds = 0.008
     world.apply_settings(settings)
 
     opt_dict = {'follow_speed_limits': False, 'ignore_traffic_lights': True, 'ignore_stop_signs': True, 'ignore_vehicles': True}
@@ -366,14 +368,14 @@ def generate_dos_data_two_car():
     agent_2.set_destination(destination)
 
     # Open log files
-    vehicle_location_writer_1 = open('./Logs_23.09375_2/gen_coord_1.log', 'w')
-    vehicle_control_writer_1 = open("./Logs_23.09375_2/gen_control_obj_1.log", "w")
+    vehicle_location_writer_1 = open('./Logs_35.5_2/gen_coord_1.log', 'w')
+    vehicle_control_writer_1 = open("./Logs_35.5_2/gen_control_obj_1.log", "w")
 
-    vehicle_location_writer_2 = open('./Logs_23.09375_2/gen_coord_2.log', 'w')
-    vehicle_control_writer_2 = open("./Logs_23.09375_2/gen_control_obj_2.log", "w")
+    vehicle_location_writer_2 = open('./Logs_35.5_2/gen_coord_2.log', 'w')
+    vehicle_control_writer_2 = open("./Logs_35.5_2/gen_control_obj_2.log", "w")
 
-    timestamp_writer = open('./Logs_23.09375_2/gen_timestamps.log', 'w')
-    dos_timestamp_writer = open('./Logs_23.09375_2/dos_timestamp.log', 'w')
+    timestamp_writer = open('./Logs_35.5_2/gen_timestamps.log', 'w')
+    dos_timestamp_writer = open('./Logs_35.5_2/dos_timestamp.log', 'w')
 
     # Initialize lists to store data
     vehicle_control_obj_1 = []
@@ -386,22 +388,23 @@ def generate_dos_data_two_car():
     # Initialize CAN data logger
     can_handler = CAN_Data_Logger()
 
-    time_diff_tick = 0.004
+    time_diff_tick = 0.006
 
-    sim_time_sec = 30 # Duration of simulation in seconds
+    sim_time_sec = 56 # Duration of simulation in seconds
     total_iterations = int(sim_time_sec / time_diff_tick)
 
     jitter_array = generate_jitter_array(0,0.0001,(total_iterations+1000)*14)
 
     dos_mode = False
     count_dos = 0
-    # num_dos_msgs = random.randint(0, 100)  # Number of DoS messages to inject
-    # print(f"Number of DoS messages to inject: {num_dos_msgs}")
-    num_dos_msgs = 500
+    num_dos_msgs = random.randint(0, 1000)  # Number of DoS messages to inject
+    print(f"Number of DoS messages to inject: {num_dos_msgs}")
+    # num_dos_msgs = 300
     skipped_control_objects = queue.Queue()
 
     # Start simulation
     start_time = timeit.default_timer()
+    can_handler.start_frame()
     try:
         for i in range(total_iterations):  
 
@@ -454,7 +457,7 @@ def generate_dos_data_two_car():
             vehicle_2.apply_control(control_2)
 
             # DoS Attack in a specific time range
-            if dos_mode or (current_time >= 23.09375 and current_time <= 23.09775):
+            if dos_mode or (current_time >= 35.5 and current_time <= 35.506):
                 dos_mode = True
                 count_dos += 1
                 # Check for number of benign timestamp to attack
@@ -463,6 +466,7 @@ def generate_dos_data_two_car():
 
                 # Inject DoS message
                 can_handler.inject_dos()
+                # print(f"Injecting DoS message at time {current_time:.6f} seconds")
 
                 skipped_control_objects.put(control_1)
                 dos_timestamp.append(current_time)
@@ -541,11 +545,11 @@ def generate_dos_data_two_car():
                 dos_timestamp_writer.write(str(ele)[:12] + '\n')
         dos_timestamp_writer.close()
 
-        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_23.09375_2/plot_throttle_time_1.png", "./Graphs_23.09375_2/plot_steer_time_1.png", "./Graphs_23.09375_2/plot_brake_time_1.png")
-        plot_diff(timestamps, "./Graphs_23.09375_2/plot_timestamp_diff_gen.png")
-        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_23.09375_2/plot_euclid_diff_gen_index.png', 0, total_iterations)
-        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_23.09375_2/gen_coord_1.log", "./Graphs_23.09375_2/benign_vs_attack_path.png", 0, total_iterations)
-        plot_benign_timeline_near_dos(timestamps, dos_timestamp, './Graphs_23.09375_2/plot_dos_timeline.png')
+        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_35.5_2/plot_throttle_time_1.png", "./Graphs_35.5_2/plot_steer_time_1.png", "./Graphs_35.5_2/plot_brake_time_1.png")
+        plot_diff(timestamps, "./Graphs_35.5_2/plot_timestamp_diff_gen.png")
+        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_35.5_2/plot_euclid_diff_gen_index.png', 0, total_iterations)
+        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_35.5_2/gen_coord_1.log", "./Graphs_35.5_2/benign_vs_attack_path.png", 0, total_iterations)
+        plot_benign_timeline_near_dos(timestamps, dos_timestamp, './Graphs_35.5_2/plot_dos_timeline.png')
 
         # Rest simulation settings
         settings.synchronous_mode = False

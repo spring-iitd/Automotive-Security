@@ -19,7 +19,7 @@ from plot_graphs import plot_diff, plot_euclid_diff, plot_euclid_diff_by_index_o
 # -- Find CARLA module ---------------------------------------------------------
 # ==============================================================================
 try:
-    sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
+    sys.path.append(glob.glob('../../../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
@@ -30,7 +30,7 @@ except IndexError:
 # -- Add PythonAPI for release mode --------------------------------------------
 # ==============================================================================
 try:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/carla')
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) + '/carla')
 except IndexError:
     pass
 
@@ -161,6 +161,11 @@ class CAN_Data_Logger_Realtime(object):
         message = can.Message(arbitration_id=0x00000000, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
 
+    def start_frame(self):
+        # To do DoS with different arbitration IDs, you can modify the arbitration_id and data fields of the message. 
+        message = can.Message(arbitration_id=0x1FFFFFFF, data=[0x00] * 8, is_extended_id=True)
+        self.bus.send(message)
+
     # These methods log dummy data to simulate various CAN messages
     def log_dummy_data_1(self):
         # To send different dummy data, you can modify the arbitration_id and data fields of the message.
@@ -235,9 +240,9 @@ class CAN_Data_Logger_Realtime(object):
             ("dummy_1", lambda: self.log_dummy_data_1(), 0.0),  # every tick
             ("dummy_2", lambda: self.log_dummy_data_2(), 0.25),
             ("dummy_3", lambda: self.log_dummy_data_3(), 0.5),
-            ("dummy_4", lambda: self.log_dummy_data_4(), 0.75),
-            ("dummy_5", lambda: self.log_dummy_data_5(), 1.0),
-            ("dummy_6", lambda: self.log_dummy_data_6(), 2.0),
+            # ("dummy_4", lambda: self.log_dummy_data_4(), 0.75),
+            # ("dummy_5", lambda: self.log_dummy_data_5(), 1.0),
+            # ("dummy_6", lambda: self.log_dummy_data_6(), 2.0),
             # Example: Add a new message here with 500ms periodicity:
             # ("my_new_msg", lambda: self.log_new_data(data), 0.5),
         ]
@@ -270,7 +275,7 @@ class CAN_Data_Logger_Realtime(object):
         sorted_actions = sorted(eligible_actions, key=lambda x: x[0])
         for _, action in sorted_actions:
             action()
-            add_delay(0.000150) #150 microseconds
+            add_delay(0.000200) #100 microseconds
 
     # This method is called when the object is deleted, shutting down the CAN bus
     def __del__(self):
@@ -550,14 +555,27 @@ def generate_data_two_car():
     # Get spawn points
     spawn_points = world.get_map().get_spawn_points()
 
+    # for i, transform in enumerate(spawn_points):
+    #     location = transform.location + carla.Location(z=1.5)  # lift text slightly above ground
+    #     world.debug.draw_string(
+    #         location,
+    #         str(i),
+    #         draw_shadow=False,
+    #         color=carla.Color(255, 0, 0),
+    #         life_time=60.0,  # Show for 60 seconds
+    #         persistent_lines=True
+    #     )
+
     # Spawn vehicle
     # car_model_list = get_actor_blueprints(self.world, self._actor_filter, self._actor_generation)
     # car_model = car_model_list[2]
     blueprint = world.get_blueprint_library().filter('vehicle.tesla.model3')[0]
+    blueprint.set_attribute('color', '0,0,255')
     source = spawn_points[11]
     vehicle_2 = world.try_spawn_actor(blueprint, source)
     world.wait_for_tick()
     source.location.y -= 25
+    blueprint.set_attribute('color', '255,0,0')
     vehicle_1 = world.try_spawn_actor(blueprint, source)
     world.wait_for_tick()
 
@@ -565,7 +583,7 @@ def generate_data_two_car():
     settings = world.get_settings()
     settings.synchronous_mode = True
     # Lower the fixed delta seconds for more stable simulation
-    settings.fixed_delta_seconds = 0.006
+    settings.fixed_delta_seconds = 0.008
     world.apply_settings(settings)
 
     opt_dict = {'follow_speed_limits': False, 'ignore_traffic_lights': True, 'ignore_stop_signs': True, 'ignore_vehicles': True}
@@ -588,6 +606,7 @@ def generate_data_two_car():
     vehicle_control_writer_2 = open('./Logs/gen_control_obj_2.log', 'w')
 
     timestamp_writer = open('./Logs/gen_timestamps.log', 'w')
+    vc_timestamp_writer = open('./Logs/gen_vehicle_control_time.log', 'w')
 
     # Initialize lists to store data
     vehicle_control_obj_1 = []
@@ -597,16 +616,17 @@ def generate_data_two_car():
     vehicle_location_2 = []
     vehicle_light_state = []
     vehicle_velocity = []
+    vehicle_control_time = []
 
     # Initialize CAN data logger
     can_handler = CAN_Data_Logger_Realtime()
     # can_handler_offline = CAN_Data_Logger_Offline(world)
 
     # Time Difference between ticks
-    time_diff_tick = 0.004
+    time_diff_tick = 0.006
 
     # Simulation time in seconds
-    sim_time_sec = 30
+    sim_time_sec = 120
 
     # Calculate total iterations based on simulation time and time difference
     total_iterations = int(sim_time_sec / time_diff_tick)
@@ -616,11 +636,14 @@ def generate_data_two_car():
 
     # Start simulation
     start_time = timeit.default_timer()
+    can_handler.start_frame()  # Start frame for CAN data logging
+
     # current_time = timeit.default_timer() - start_time
     try:
         for i in range(total_iterations):  
             # Get current time
             current_time = timeit.default_timer() - start_time
+            # print(f"Current Time: {current_time} seconds")
 
             # print(str(current_time))
             timestamps.append(current_time)
@@ -652,6 +675,8 @@ def generate_data_two_car():
             # vehicle_light_state.append(vehicle_1.get_light_state())
             # vehicle_velocity.append(vehicle_1.get_velocity())
 
+            vehicle_control_apply_time = timeit.default_timer() - start_time
+            vehicle_control_time.append(vehicle_control_apply_time)
             # Log the data to CAN messages for both vehicles
             can_handler.log_realtime_data(
                     i,
@@ -730,14 +755,32 @@ def generate_data_two_car():
             vehicle_control_writer_2.write(str(control) + "\n")
         vehicle_control_writer_2.close()
         
+        # for ele in timestamps:
+        #     if (ele < 0.000001):
+        #         timestamp_writer.write("00.000000" + '\n')
+        #     elif (ele < 10):
+        #         timestamp_writer.write("0" + str(ele)[:8] + '\n')
+        #     else:
+        #         timestamp_writer.write(str(ele)[:9] + '\n')
+        # timestamp_writer.close()
+
         for ele in timestamps:
-            if (ele < 0.000001):
-                timestamp_writer.write("00.000000" + '\n')
-            elif (ele < 10):
-                timestamp_writer.write("0" + str(ele)[:8] + '\n')
+            if ele < 0.000001:
+                timestamp_writer.write("00.000000\n")
+            elif ele < 10:
+                timestamp_writer.write(f"0{ele:.6f}\n")
             else:
-                timestamp_writer.write(str(ele)[:9] + '\n')
+                timestamp_writer.write(f"{ele:.6f}\n")
         timestamp_writer.close()
+
+        for ele in vehicle_control_time:
+            if (ele < 0.000001):
+                vc_timestamp_writer.write("00.000000" + '\n')
+            elif (ele < 10):
+                vc_timestamp_writer.write("0" + str(ele)[:8] + '\n')
+            else:
+                vc_timestamp_writer.write(str(ele)[:9] + '\n')
+        vc_timestamp_writer.close()
 
         for location in vehicle_location_1:
             vehicle_location_writer_1.write(str(location) + "\n")
@@ -752,8 +795,9 @@ def generate_data_two_car():
         plot_diff(timestamps, "./Graphs/plot_timestamp_diff_gen.png")
         plot_euclid_diff(vehicle_location_1, vehicle_location_2, timestamps, "./Graphs/plot_euclid_diff_benign.png")
         plot_gen_path_only_from_list(vehicle_location_1, './Graphs/plot_gen_path_only.png', 0, total_iterations)
-        
-        # plot_euclid_diff_single_function(vehicle_location_1, vehicle_location_2, timestamps,'./Logs_Truck','./Graphs/plot_euclid_diff_gen_time.png')
+        plot_diff(vehicle_control_time, "./Graphs/plot_vehicle_control_time_diff.png")
+
+        # plot_euclid_diff_single_function(vehicle_location_1, vehicle_location_2, timestamps,'./Logs_Car','./Graphs/plot_euclid_diff_gen_time.png')
         # plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs_Car', './Graphs/plot_euclid_diff_gen_index.png', 0, total_iterations)
         # plot_gen_vs_rep_paths_from_files("./Logs_Car/gen_coord_1.log", "./Logs/gen_coord_1.log", "./Graphs/benign_vs_attack_path.png", 0, total_iterations)
 

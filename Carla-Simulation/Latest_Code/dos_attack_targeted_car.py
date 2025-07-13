@@ -1,3 +1,6 @@
+"""
+    This script generates a Denial of Service (DoS) attack scenario in CARLA with two vehicles.
+"""
 import glob
 import os
 import queue

@@ -17,7 +17,7 @@ from plot_graphs import plot_diff, plot_euclid_diff, plot_euclid_diff_by_index_o
 # -- Find CARLA module ---------------------------------------------------------
 # ==============================================================================
 try:
-    sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
+    sys.path.append(glob.glob('../../../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
@@ -28,7 +28,7 @@ except IndexError:
 # -- Add PythonAPI for release mode --------------------------------------------
 # ==============================================================================
 try:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/carla')
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))) + '/carla')
 except IndexError:
     pass
 
@@ -143,6 +143,11 @@ class CAN_Data_Logger(object):
         message = can.Message(arbitration_id=0x00000000, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
 
+    def start_frame(self):
+        # To do DoS with different arbitration IDs, you can modify the arbitration_id and data fields of the message. 
+        message = can.Message(arbitration_id=0x1FFFFFFF, data=[0x00] * 8, is_extended_id=True)
+        self.bus.send(message)
+
     def log_dummy_data_1(self):
         message = can.Message(arbitration_id=0x00000130, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
@@ -224,6 +229,9 @@ class CAN_Data_Logger(object):
             ("headlight", lambda: self.log_headlight_data(low_beam, high_beam), 1.0),
             ("beam", lambda: self.log_beam_data(low_beam, high_beam, park_lights), 1.0),
             ("handbrake", lambda: self.log_handbrake_data(handbrake), 1.0),
+            ("dummy_1", lambda: self.log_dummy_data_1(), 0.0),  # every tick
+            ("dummy_2", lambda: self.log_dummy_data_2(), 0.25),
+            ("dummy_3", lambda: self.log_dummy_data_3(), 0.5),
             # Example: Add a new message here with 500ms periodicity:
             # ("my_new_msg", lambda: self.log_new_data(data), 0.5),
         ]
@@ -247,7 +255,7 @@ class CAN_Data_Logger(object):
         sorted_actions = sorted(eligible_actions, key=lambda x: x[0])
         for _, action in sorted_actions:
             action()
-            add_delay(0.00015) #150 microseconds
+            add_delay(0.000200) #150 microseconds
 
     def __del__(self):
         self.bus.shutdown()
@@ -349,10 +357,10 @@ def generate_spoof_data_two_car():
     client.set_timeout(10.0)
     
     # Load the map
-    # world = client.load_world('Town05_Opt', reset_settings=True, map_layers= carla.MapLayer.NONE)
-    # world.load_map_layer(carla.MapLayer.Buildings)
-    # world.load_map_layer(carla.MapLayer.Ground)
-    world = client.get_world()
+    world = client.load_world('Town05_Opt', reset_settings=True, map_layers= carla.MapLayer.NONE)
+    world.load_map_layer(carla.MapLayer.Buildings)
+    world.load_map_layer(carla.MapLayer.Ground)
+    # world = client.get_world()
 
     # Get spawn points
     spawn_points = world.get_map().get_spawn_points()
@@ -373,7 +381,7 @@ def generate_spoof_data_two_car():
     # Configure synchronous simulation
     settings = world.get_settings()
     settings.synchronous_mode = True
-    settings.fixed_delta_seconds = 0.006
+    settings.fixed_delta_seconds = 0.008
     world.apply_settings(settings)
 
     opt_dict = {'follow_speed_limits': False, 'ignore_traffic_lights': True, 'ignore_stop_signs': True, 'ignore_vehicles': True}
@@ -389,14 +397,14 @@ def generate_spoof_data_two_car():
     agent_2.set_destination(destination)
 
     # Open log files
-    vehicle_location_writer_1 = open('./Logs_23.5_1/gen_coord_1.log', 'w')
-    vehicle_control_writer_1 = open("./Logs_23.5_1/gen_control_obj_1.log", "w")
+    vehicle_location_writer_1 = open('./Logs_35.5_1/gen_coord_1.log', 'w')
+    vehicle_control_writer_1 = open("./Logs_35.5_1/gen_control_obj_1.log", "w")
 
-    vehicle_location_writer_2 = open('./Logs_23.5_1/gen_coord_2.log', 'w')
-    vehicle_control_writer_2 = open("./Logs_23.5_1/gen_control_obj_2.log", "w")
+    vehicle_location_writer_2 = open('./Logs_35.5_1/gen_coord_2.log', 'w')
+    vehicle_control_writer_2 = open("./Logs_35.5_1/gen_control_obj_2.log", "w")
 
-    timestamp_writer = open('./Logs_23.5_1/gen_timestamps.log', 'w')
-    spoof_timestamp_writer = open('./Logs_23.5_1/spoof_timestamp.log', 'w')
+    timestamp_writer = open('./Logs_35.5_1/gen_timestamps.log', 'w')
+    spoof_timestamp_writer = open('./Logs_35.5_1/spoof_timestamp.log', 'w')
 
     # Initialize lists to store data
     vehicle_control_obj_1 = []
@@ -409,18 +417,23 @@ def generate_spoof_data_two_car():
     # Initialize CAN data logger
     can_handler = CAN_Data_Logger()
 
-    time_diff_tick = 0.004
+    time_diff_tick = 0.006
 
-    sim_time_sec = 30 # Duration of simulation in seconds
+    sim_time_sec = 55 # Duration of simulation in seconds
     total_iterations = int(sim_time_sec / time_diff_tick)
 
-    jitter_array = generate_jitter_array(0,0.0001,(total_iterations+1000)*8)
+    jitter_array = generate_jitter_array(0,0.0001,(total_iterations+1000)*14)
 
     spoof_mode = False
     count_spoof = 0
+    num_spoof_msgs = random.randint(0,150)
+    print("Number spoof: ", num_spoof_msgs)
+    spoof_delay = random.uniform(0.0, 0.0050)
+    print("Amount of Delay: ", spoof_delay) 
 
     # Start simulation
     start_time = timeit.default_timer()
+    can_handler.start_frame()
     try:
         for i in range(total_iterations):  
 
@@ -469,22 +482,22 @@ def generate_spoof_data_two_car():
             vehicle_control_obj_2.append(control_2)
 
             # Spoofing Attack in a specific time range
-            if spoof_mode or (current_time >= 23.5 and current_time <= 23.504):
+            if spoof_mode or (current_time >= 35.5 and current_time <= 35.506):
                 spoof_mode = True
                 count_spoof += 1
                 # Check for number of benign timestamp to attack
-                if count_spoof >= 50:
+                if count_spoof >= num_spoof_msgs:
                     spoof_mode = False
 
                 # Add delay to the spoofed control
-                delay_time = current_time + 0.0025
+                delay_time = current_time + spoof_delay
                 current_timestamp = timeit.default_timer()-start_time
                 while current_timestamp < delay_time:
                     current_timestamp = timeit.default_timer()-start_time
 
                 # Apply the spoofed control to the first vehicle in the current tick
                 count = 0
-                control_1.steer = 1.0
+                control_1.steer = -1.0
                 while count < 1:
                     current_timestamp = timeit.default_timer()-start_time
                     spoof_timestamp.append(current_timestamp)
@@ -560,10 +573,10 @@ def generate_spoof_data_two_car():
                 spoof_timestamp_writer.write(str(ele)[:12] + '\n')
         spoof_timestamp_writer.close()
 
-        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_23.5_1/plot_throttle_time_1.png", "./Graphs_23.5_1/plot_steer_time_1.png", "./Graphs_23.5_1/plot_brake_time_1.png")
-        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_23.5_1/plot_euclid_diff_gen_index.png', 0, total_iterations)
-        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_23.5_1/gen_coord_1.log", "./Graphs_23.5_1/benign_vs_attack_path.png", 0, total_iterations)
-        plot_spoof_timeline(timestamps, spoof_timestamp, './Graphs_23.5_1/plot_spoof_timeline_combined.png')
+        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_35.5_1/plot_throttle_time_1.png", "./Graphs_35.5_1/plot_steer_time_1.png", "./Graphs_35.5_1/plot_brake_time_1.png")
+        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_35.5_1/plot_euclid_diff_gen_index.png', 0, total_iterations)
+        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_35.5_1/gen_coord_1.log", "./Graphs_35.5_1/benign_vs_attack_path.png", 0, total_iterations)
+        plot_spoof_timeline(timestamps, spoof_timestamp, './Graphs_35.5_1/plot_spoof_timeline_combined.png')
 
         # Rest simulation settings
         settings.synchronous_mode = False

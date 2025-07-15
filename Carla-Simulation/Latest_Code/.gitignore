@@ -2,3 +2,5 @@ carla-venv/
 **/Graphs*/
 **/Logs*/
 __pycache__/
+test.py
+stats*

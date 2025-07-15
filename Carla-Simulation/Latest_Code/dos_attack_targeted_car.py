@@ -377,6 +377,7 @@ def generate_dos_data_two_car():
     timestamp_writer = open('./Logs_25.5_1/gen_timestamps.log', 'w')
     dos_timestamp_writer = open('./Logs_25.5_1/dos_timestamp.log', 'w')
     jitter_array_writer = open('./Logs_25.5_1/jitter_array.log', 'w')
+    vc_timestamp_writer = open('./Logs_25.5_1/gen_vehicle_control_time.log', 'w')
 
     # Initialize lists to store data
     vehicle_control_obj_1 = []
@@ -385,6 +386,7 @@ def generate_dos_data_two_car():
     vehicle_location_1 = []
     vehicle_location_2 = []
     dos_timestamp = []
+    vehicle_control_time = []
 
     # Initialize CAN data logger
     can_handler = CAN_Data_Logger()
@@ -399,7 +401,7 @@ def generate_dos_data_two_car():
     dos_mode = False
     count_dos = 0
     num_dos_msgs = random.randint(0, 100)  # Number of DoS messages to inject
-    # num_dos_msgs = 300
+    num_dos_msgs = 100
     print(f"Number of DoS messages to inject: {num_dos_msgs}")
     skipped_control_objects = queue.Queue()
 
@@ -457,6 +459,9 @@ def generate_dos_data_two_car():
             #Application of benign control
             vehicle_2.apply_control(control_2)
 
+            vehicle_control_apply_time = timeit.default_timer() - start_time
+            vehicle_control_time.append(vehicle_control_apply_time)
+
             # DoS Attack in a specific time range
             if dos_mode or (current_time >= 25.5 and current_time <= 25.506):
                 dos_mode = True
@@ -496,6 +501,7 @@ def generate_dos_data_two_car():
                 
                 vehicle_control_obj_1.append(control_1)
            
+            # print(speed)
     
             #Log Vehicle Control Data  
             vehicle_control_obj_2.append(control_2)
@@ -523,13 +529,22 @@ def generate_dos_data_two_car():
         vehicle_control_writer_2.close()
         
         for ele in timestamps:
-            if (ele < 0.000001):
+            if (ele < 0.0001):
                 timestamp_writer.write("00.000000" + '\n')
             elif (ele < 10):
                 timestamp_writer.write("0" + str(ele)[:8] + '\n')
             else:
                 timestamp_writer.write(str(ele)[:9] + '\n')
         timestamp_writer.close()
+
+        for ele in vehicle_control_time:
+            if (ele < 0.000001):
+                vc_timestamp_writer.write("00.000000" + '\n')
+            elif (ele < 10):
+                vc_timestamp_writer.write("0" + str(ele)[:8] + '\n')
+            else:
+                vc_timestamp_writer.write(str(ele)[:9] + '\n')
+        vc_timestamp_writer.close()
 
         for location in vehicle_location_1:
             vehicle_location_writer_1.write(str(location) + "\n")

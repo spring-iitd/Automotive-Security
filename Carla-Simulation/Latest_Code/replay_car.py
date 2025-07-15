@@ -1,3 +1,4 @@
+from collections import deque
 import glob
 import os
 import queue
@@ -148,21 +149,18 @@ class CAN_Data_Logger(object):
         message = can.Message(arbitration_id=0x1FFFFFFF, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
 
-    def log_dummy_data_1(self):
-        data=[0x00] * 8
-        data[0] = random.randint(0, 255)
+    def log_dummy_data_1(self, queue_170):
+        data = queue_170.popleft()
         message = can.Message(arbitration_id=0x00000170, data=data, is_extended_id=True)
         self.bus.send(message)
 
-    def log_dummy_data_2(self):
-        data=[0x00] * 8
-        data[1] = random.randint(0, 255)
+    def log_dummy_data_2(self, queue_202):
+        data = queue_202.popleft()
         message = can.Message(arbitration_id=0x00000202, data=data, is_extended_id=True)
         self.bus.send(message)
     
-    def log_dummy_data_3(self):
-        data=[0x00] * 8
-        data[2] = random.randint(0, 255)
+    def log_dummy_data_3(self, queue_18F):
+        data = queue_18F.popleft()
         message = can.Message(arbitration_id=0x0000018f, data=data, is_extended_id=True)
         self.bus.send(message)
 
@@ -186,7 +184,7 @@ class CAN_Data_Logger(object):
 
     def log_data(self, index, time_diff_tick, steer_data, throttle_data, brake_data, gear_data,
              manual_gear_shift, left_blinker, right_blinker, low_beam, high_beam,
-             park_lights, handbrake, speed_data, jitter_array):
+             park_lights, handbrake, speed_data, jitter_array, queue_170, queue_202, queue_18F):
 
         message_specs = [
             ("steer", lambda: self.log_steer_data(steer_data), 0.0),           # every tick
@@ -197,9 +195,9 @@ class CAN_Data_Logger(object):
             ("headlight", lambda: self.log_headlight_data(low_beam, high_beam), 1.0),
             ("beam", lambda: self.log_beam_data(low_beam, high_beam, park_lights), 1.0),
             ("handbrake", lambda: self.log_handbrake_data(handbrake), 1.0),
-            ("dummy_1", lambda: self.log_dummy_data_1(), 0.0),  # every tick
-            ("dummy_2", lambda: self.log_dummy_data_2(), 0.25),
-            ("dummy_3", lambda: self.log_dummy_data_3(), 0.5),
+            ("dummy_1", lambda: self.log_dummy_data_1(queue_170), 0.0),  # every tick
+            ("dummy_2", lambda: self.log_dummy_data_2(queue_202), 0.25),
+            ("dummy_3", lambda: self.log_dummy_data_3(queue_18F), 0.5),
             # ("dummy_4", lambda: self.log_dummy_data_4(), 0.75),
             # ("dummy_5", lambda: self.log_dummy_data_5(), 1.0),
             # ("dummy_6", lambda: self.log_dummy_data_6(), 2.0),
@@ -364,12 +362,55 @@ def read_jitter_array(file_path):
         print(f"[ERROR] Invalid value in jitter array file: {e}")
     return jitter_array
 
+# def convert_can_to_control_data(file_path):
+#     control_obj = []
+#     can_logger = CAN_Data_Logger()
+    
+#     current_group = {'14A': None, '17C': None}
+
+#     def add_control_obj():
+#         steer_msg = current_group['14A']
+#         throttle_msg = current_group['17C']
+        
+#         throttle, steer, brake, _, _, _, gear = can_logger.parse_logs(steer_msg, throttle_msg)
+        
+#         control_obj.append(carla.VehicleControl(
+#             throttle=throttle,
+#             steer=steer,
+#             brake=brake,
+#             gear=gear
+#         ))
+
+#     with open(file_path, 'r') as file:
+#         for line in file:
+#             msg = can_logger.convert_to_CAN_msg(line)
+#             can_id = msg.arbitration_id
+
+#             if can_id == 0x14A:
+#                 current_group['14A'] = msg
+
+#             elif can_id == 0x17C:
+#                 current_group['17C'] = msg
+
+#             # If all two messages are present, process
+#             if all(current_group.values()):
+#                 add_control_obj()
+#                 current_group = {'14A': None, '17C': None}
+
+#     return control_obj
+
 def convert_can_to_control_data(file_path):
     control_obj = []
     can_logger = CAN_Data_Logger()
-    
+
     current_group = {'14A': None, '17C': None}
 
+    # Initialize queues for specific CAN IDs
+    queue_170 = deque()
+    queue_202 = deque()
+    queue_18F = deque()
+
+    # Helper function to add parsed VehicleControl object
     def add_control_obj():
         steer_msg = current_group['14A']
         throttle_msg = current_group['17C']
@@ -385,21 +426,45 @@ def convert_can_to_control_data(file_path):
 
     with open(file_path, 'r') as file:
         for line in file:
-            msg = can_logger.convert_to_CAN_msg(line)
-            can_id = msg.arbitration_id
+            # Extract CAN ID in hex string format
+            parts = line.strip().split()
+            if len(parts) >= 6:
+                try:
+                    hex_id = parts[2]
+                    data_bytes = parts[4:12]  # List of 8 data bytes
+                    data_ints = [int(byte, 16) for byte in data_bytes]  # Convert strings to integers (base 16)
 
-            if can_id == 0x14A:
-                current_group['14A'] = msg
+                    if hex_id == '00000170':
+                        queue_170.append(data_ints)
+                    elif hex_id == '00000202':
+                        queue_202.append(data_ints)
+                    elif hex_id == '0000018F':
+                        queue_18F.append(data_ints)
+                except IndexError:
+                    continue  # Malformed line; skip
 
-            elif can_id == 0x17C:
-                current_group['17C'] = msg
+            # Convert to CAN message object
+            try:
+                msg = can_logger.convert_to_CAN_msg(line)
+                can_id = msg.arbitration_id
 
-            # If all two messages are present, process
-            if all(current_group.values()):
-                add_control_obj()
-                current_group = {'14A': None, '17C': None}
+                if can_id == 0x14A:
+                    current_group['14A'] = msg
+                elif can_id == 0x17C:
+                    current_group['17C'] = msg
 
-    return control_obj
+                # If both messages available, parse and reset
+                if all(current_group.values()):
+                    add_control_obj()
+                    current_group = {'14A': None, '17C': None}
+            except Exception:
+                continue  # Ignore lines that can't be parsed
+
+    # You now have:
+    # - control_obj: list of VehicleControl objects
+    # - queue_170, queue_202, queue_18F: CAN data queues
+
+    return control_obj, queue_170, queue_202, queue_18F
 
 def extract_control_data(file_path):
     control_obj = []
@@ -470,10 +535,11 @@ def replay_dos_data_two_car():
     timestamp_writer = open('./Logs_Replay/gen_timestamps.log', 'w')
     dos_timestamp_writer = open('./Logs_Replay/dos_timestamp.log', 'w')
 
-    timestamp_reader = open('./Logs_25.5_1/gen_timestamps.log', 'r')
+    timestamp_reader = open('./Logs_25.5_1/gen_vehicle_control_time.log', 'r')
 
     # Initialize lists to store data
-    vehicle_control_obj_1 = convert_can_to_control_data('./Logs_25.5_1/can_data_logs.log')
+    vehicle_control_obj_1, queue_170, queue_202, queue_18F  = convert_can_to_control_data('./Logs_25.5_1/can_data_logs.log')
+    # vehicle_control_obj_1 = extract_control_data('./Logs_25.5_1/gen_control_obj_1.log')
     vehicle_control_obj_2 = extract_control_data('./Logs_25.5_1/gen_control_obj_2.log')
     timestamps = []
     vehicle_location_1 = []
@@ -495,7 +561,7 @@ def replay_dos_data_two_car():
 
     dos_mode = False
     count_dos = 0
-    num_dos_msgs = 95 # Number of DoS messages to inject
+    num_dos_msgs = 100 # Number of DoS messages to inject
     print(f"Number of DoS messages to inject: {num_dos_msgs}")
     skipped_control_objects = queue.Queue()
 
@@ -506,12 +572,12 @@ def replay_dos_data_two_car():
         for i in range(len(vehicle_control_obj_1)):  
 
             # Get current time
-            current_time = timeit.default_timer() - start_time
+            # current_time = timeit.default_timer() - start_time
 
-            while current_time < gen_timestamps[i]:
-                current_time = timeit.default_timer() - start_time
+            # while current_time < gen_timestamps[i]:
+            #     current_time = timeit.default_timer() - start_time
 
-            timestamps.append(current_time)
+            # timestamps.append(current_time)
 
             world.tick()
 
@@ -538,22 +604,30 @@ def replay_dos_data_two_car():
                             light_status["park_lights_set"],
                             control.hand_brake,
                             speed,
-                            jitter_array
+                            jitter_array,
+                            queue_170, queue_202, queue_18F
                         )
 
-                    vehicle_control_obj_1.append(control)
+                    # vehicle_control_obj_1.append(control)
 
                 count_dos = 0
 
             # # Get current control state
             control_1 = vehicle_control_obj_1[i]
-            control_2 = vehicle_control_obj_2[i]
+            control_2 = agent_2.run_step()
 
             current_location_1 = vehicle_1.get_location()
             current_location_2 = vehicle_2.get_location()
 
             #Application of benign control
             vehicle_2.apply_control(control_2)
+
+            current_time = timeit.default_timer() - start_time
+
+            while current_time < gen_timestamps[i]:
+                current_time = timeit.default_timer() - start_time
+
+            timestamps.append(current_time)
 
             # DoS Attack in a specific time range
             if dos_mode or (current_time >= 25.5 and current_time <= 25.506):
@@ -589,14 +663,16 @@ def replay_dos_data_two_car():
                         light_status["park_lights_set"],
                         control_1.hand_brake,
                         speed,
-                        jitter_array
+                        jitter_array,
+                        queue_170, queue_202, queue_18F
                     )
                 
-                vehicle_control_obj_1.append(control_1)
+                # vehicle_control_obj_1.append(control_1)
            
-    
+            # print(speed)
+
             #Log Vehicle Control Data  
-            vehicle_control_obj_2.append(control_2)
+            # vehicle_control_obj_2.append(control_2)
 
             # Logging vehicle location data
             vehicle_location_1.append(current_location_1)
@@ -616,7 +692,7 @@ def replay_dos_data_two_car():
         vehicle_control_writer_2.close()
         
         for ele in timestamps:
-            if (ele < 0.000001):
+            if (ele < 0.0001):
                 timestamp_writer.write("00.000000" + '\n')
             elif (ele < 10):
                 timestamp_writer.write("0" + str(ele)[:8] + '\n')

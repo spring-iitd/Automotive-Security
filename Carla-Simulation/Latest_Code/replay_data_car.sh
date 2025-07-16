@@ -17,7 +17,7 @@ clearTmpFiles() {
 }
 
 runRepLogScript() {
-    python3 ./replay_car.py
+    python3 ./replay_car_temp.py
 }
 
 startCanDump() {

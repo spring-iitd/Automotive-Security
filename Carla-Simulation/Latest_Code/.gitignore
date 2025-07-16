@@ -4,3 +4,4 @@ carla-venv/
 __pycache__/
 test.py
 stats*
+*temp*

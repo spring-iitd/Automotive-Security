@@ -1,10 +1,12 @@
 from collections import deque
 import glob
+from multiprocessing import Event, Process
 import os
 import queue
 import random
 import re
 import sys
+import threading
 import time
 import timeit
 
@@ -149,6 +151,10 @@ class CAN_Data_Logger(object):
         message = can.Message(arbitration_id=0x1FFFFFFF, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
 
+    def inject_data(self, can_id, can_data):
+        message = can.Message(arbitration_id=can_id, data=can_data, is_extended_id=True)
+        self.bus.send(message)
+
     def log_dummy_data_1(self, queue_170):
         data = queue_170.popleft()
         message = can.Message(arbitration_id=0x00000170, data=data, is_extended_id=True)
@@ -228,21 +234,23 @@ class CAN_Data_Logger(object):
 
     def parse_logs(self, steer_msg, throttle_brake_msg):
         steer = 0.0
-        can_id = steer_msg.arbitration_id
-
-        if can_id == self.steer_message.frame_id:
-            steer_data = self.steer_message.decode(steer_msg.data)
-            steer = steer_data['STEER_ANGLE']
-        
         throttle, brake = 0.0, 0.0
-        can_id = throttle_brake_msg.arbitration_id
+        gear = 0
 
-        if can_id == self.throttle_brake_message.frame_id:
-            throttle_brake_data = self.throttle_brake_message.decode(throttle_brake_msg.data)
-            throttle = throttle_brake_data['PEDAL_GAS']
-            brake = throttle_brake_data['BRAKE_PRESSED']
+        # Handle steer message (can be None)
+        if steer_msg is not None:
+            can_id = steer_msg.arbitration_id
+            if can_id == self.steer_message.frame_id:
+                steer_data = self.steer_message.decode(steer_msg.data)
+                steer = steer_data['STEER_ANGLE']
 
-        gear = 0        
+        # Handle throttle/brake message (can be None)
+        if throttle_brake_msg is not None:
+            can_id = throttle_brake_msg.arbitration_id
+            if can_id == self.throttle_brake_message.frame_id:
+                throttle_brake_data = self.throttle_brake_message.decode(throttle_brake_msg.data)
+                throttle = throttle_brake_data['PEDAL_GAS']
+                brake = throttle_brake_data['BRAKE_PRESSED']
 
         return throttle, steer, brake, False, False, False, gear
     
@@ -399,40 +407,118 @@ def read_jitter_array(file_path):
 
 #     return control_obj
 
+# def convert_can_to_control_data(file_path):
+#     control_obj = []
+#     can_logger = CAN_Data_Logger()
+
+#     current_group = {'14A': None, '17C': None}
+
+#     # Initialize queues for specific CAN IDs
+#     queue_170 = deque()
+#     queue_202 = deque()
+#     queue_18F = deque()
+
+#     # Helper function to add parsed VehicleControl object
+#     def add_control_obj():
+#         steer_msg = current_group['14A']
+#         throttle_msg = current_group['17C']
+        
+#         throttle, steer, brake, _, _, _, gear = can_logger.parse_logs(steer_msg, throttle_msg)
+        
+#         control_obj.append(carla.VehicleControl(
+#             throttle=throttle,
+#             steer=steer,
+#             brake=brake,
+#             gear=gear
+#         ))
+
+#     with open(file_path, 'r') as file:
+#         for line in file:
+#             # Extract CAN ID in hex string format
+#             parts = line.strip().split()
+#             if len(parts) >= 6:
+#                 try:
+#                     hex_id = parts[2]
+#                     data_bytes = parts[4:12]  # List of 8 data bytes
+#                     data_ints = [int(byte, 16) for byte in data_bytes]  # Convert strings to integers (base 16)
+
+#                     if hex_id == '00000170':
+#                         queue_170.append(data_ints)
+#                     elif hex_id == '00000202':
+#                         queue_202.append(data_ints)
+#                     elif hex_id == '0000018F':
+#                         queue_18F.append(data_ints)
+#                 except IndexError:
+#                     continue  # Malformed line; skip
+
+#             # Convert to CAN message object
+#             try:
+#                 msg = can_logger.convert_to_CAN_msg(line)
+#                 can_id = msg.arbitration_id
+
+#                 if can_id == 0x14A:
+#                     current_group['14A'] = msg
+#                 elif can_id == 0x17C:
+#                     current_group['17C'] = msg
+
+#                 # If both messages available, parse and reset
+#                 if all(current_group.values()):
+#                     add_control_obj()
+#                     current_group = {'14A': None, '17C': None}
+#             except Exception:
+#                 continue  # Ignore lines that can't be parsed
+
+#     # You now have:
+#     # - control_obj: list of VehicleControl objects
+#     # - queue_170, queue_202, queue_18F: CAN data queues
+
+#     return control_obj, queue_170, queue_202, queue_18F
+
 def convert_can_to_control_data(file_path):
     control_obj = []
+    control_timestamps = []
     can_logger = CAN_Data_Logger()
 
     current_group = {'14A': None, '17C': None}
+    last_control = None  # Keep track of last control values
 
-    # Initialize queues for specific CAN IDs
     queue_170 = deque()
     queue_202 = deque()
     queue_18F = deque()
 
     # Helper function to add parsed VehicleControl object
-    def add_control_obj():
-        steer_msg = current_group['14A']
-        throttle_msg = current_group['17C']
-        
-        throttle, steer, brake, _, _, _, gear = can_logger.parse_logs(steer_msg, throttle_msg)
-        
-        control_obj.append(carla.VehicleControl(
-            throttle=throttle,
-            steer=steer,
-            brake=brake,
-            gear=gear
-        ))
+    def add_control_obj(steer_msg, throttle_msg):
+        try:
+            if steer_msg and throttle_msg:
+                throttle, steer, brake, _, _, _, gear = can_logger.parse_logs(steer_msg, throttle_msg)
+            elif steer_msg and last_control:
+                throttle, brake, gear = last_control.throttle, last_control.brake, last_control.gear
+                _, steer, _, _, _, _, _ = can_logger.parse_logs(steer_msg, None)
+            elif throttle_msg and last_control:
+                steer = last_control.steer
+                throttle, _, brake, _, _, _, gear = can_logger.parse_logs(None, throttle_msg)
+            else:
+                return None  # Can't form control without at least steer or throttle and fallback
+
+            control = carla.VehicleControl(
+                throttle=throttle,
+                steer=steer,
+                brake=brake,
+                gear=gear
+            )
+            control_obj.append(control)
+            return control
+        except Exception:
+            return None  # Ignore parse errors
 
     with open(file_path, 'r') as file:
         for line in file:
-            # Extract CAN ID in hex string format
             parts = line.strip().split()
             if len(parts) >= 6:
                 try:
                     hex_id = parts[2]
-                    data_bytes = parts[4:12]  # List of 8 data bytes
-                    data_ints = [int(byte, 16) for byte in data_bytes]  # Convert strings to integers (base 16)
+                    data_bytes = parts[4:12]
+                    data_ints = [int(byte, 16) for byte in data_bytes]
 
                     if hex_id == '00000170':
                         queue_170.append(data_ints)
@@ -443,28 +529,40 @@ def convert_can_to_control_data(file_path):
                 except IndexError:
                     continue  # Malformed line; skip
 
-            # Convert to CAN message object
             try:
                 msg = can_logger.convert_to_CAN_msg(line)
                 can_id = msg.arbitration_id
 
                 if can_id == 0x14A:
+                    # Steer message
+                    if current_group['14A']:
+                        control_timestamps.append(msg.timestamp)  # Store timestamp for control
+                        control = add_control_obj(msg, current_group['17C'])
+                        if control:
+                            last_control = control
                     current_group['14A'] = msg
+
                 elif can_id == 0x17C:
+                    # Throttle message
+                    if current_group['17C']:
+                        control_timestamps.append(msg.timestamp)  # Store timestamp for control
+                        control = add_control_obj(current_group['14A'], msg)
+                        if control:
+                            last_control = control
                     current_group['17C'] = msg
 
-                # If both messages available, parse and reset
-                if all(current_group.values()):
-                    add_control_obj()
+                # If both messages now present, process and reset
+                if current_group['14A'] and current_group['17C']:
+                    control = add_control_obj(current_group['14A'], current_group['17C'])
+                    if control:
+                        last_control = control
                     current_group = {'14A': None, '17C': None}
+
             except Exception:
-                continue  # Ignore lines that can't be parsed
+                continue  # Skip unparseable lines
 
-    # You now have:
-    # - control_obj: list of VehicleControl objects
-    # - queue_170, queue_202, queue_18F: CAN data queues
+    return control_obj, queue_170, queue_202, queue_18F, control_timestamps
 
-    return control_obj, queue_170, queue_202, queue_18F
 
 def extract_control_data(file_path):
     control_obj = []
@@ -479,6 +577,27 @@ def extract_control_data(file_path):
                 control_obj.append(carla.VehicleControl(throttle=float(throttle), steer=float(steer), brake=float(brake), gear=int(gear)))
     
     return control_obj
+
+def parse_can_log(file_path):
+    # Define the regex pattern
+    pattern = re.compile(r"\(([\d\.]+)\)\s+vcan0\s+([0-9A-Fa-f]{8})\s+\[\d\]\s+((?:[0-9A-Fa-f]{2}\s+){7}[0-9A-Fa-f]{2})")
+
+    parsed_data = []
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            match = pattern.search(line)
+            if match:
+                timestamp = float(match.group(1))
+                can_id = int(match.group(2), 16)  # Convert to integer
+                data = [int(byte_str, 16) for byte_str in match.group(3).strip().split()]
+                parsed_data.append({
+                    'timestamp': timestamp,
+                    'id': can_id,
+                    'data': data
+                })
+
+    return parsed_data
 
 def replay_dos_data_two_car():
     # Initialize CARLA client
@@ -536,9 +655,9 @@ def replay_dos_data_two_car():
     dos_timestamp_writer = open('./Logs_Replay/dos_timestamp.log', 'w')
 
     timestamp_reader = open('./Logs_25.5_1/gen_vehicle_control_time.log', 'r')
-
+    
     # Initialize lists to store data
-    vehicle_control_obj_1, queue_170, queue_202, queue_18F  = convert_can_to_control_data('./Logs_25.5_1/can_data_logs.log')
+    vehicle_control_obj_1, queue_170, queue_202, queue_18F, control_timestamps  = convert_can_to_control_data('./Logs_25.5_1/can_data_logs.log')
     # vehicle_control_obj_1 = extract_control_data('./Logs_25.5_1/gen_control_obj_1.log')
     vehicle_control_obj_2 = extract_control_data('./Logs_25.5_1/gen_control_obj_2.log')
     timestamps = []
@@ -548,13 +667,15 @@ def replay_dos_data_two_car():
 
     # Read timestamps from the generated log file
     gen_timestamps = [float(line.strip()) for line in timestamp_reader if line.strip()]
+    gen_timestamps.extend(control_timestamps)  # Append control timestamps to the generated timestamps
+    gen_timestamps.sort()  # Sort all timestamps
 
     # Initialize CAN data logger
     can_handler = CAN_Data_Logger()
 
     time_diff_tick = 0.006
 
-    sim_time_sec = 36 # Duration of simulation in seconds
+    sim_time_sec = 36 #Duration of simulation in seconds
     total_iterations = int(sim_time_sec / time_diff_tick)
 
     jitter_array = read_jitter_array('./Logs_25.5_1/jitter_array.log') 
@@ -568,6 +689,7 @@ def replay_dos_data_two_car():
     # Start simulation
     start_time = timeit.default_timer()
     can_handler.start_frame()
+
     try:
         for i in range(len(vehicle_control_obj_1)):  
 

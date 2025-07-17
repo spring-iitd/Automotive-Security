@@ -397,14 +397,16 @@ def generate_spoof_data_two_car():
     agent_2.set_destination(destination)
 
     # Open log files
-    vehicle_location_writer_1 = open('./Logs_35.5_1/gen_coord_1.log', 'w')
-    vehicle_control_writer_1 = open("./Logs_35.5_1/gen_control_obj_1.log", "w")
+    vehicle_location_writer_1 = open('./Logs_26.0_1/gen_coord_1.log', 'w')
+    vehicle_control_writer_1 = open("./Logs_26.0_1/gen_control_obj_1.log", "w")
 
-    vehicle_location_writer_2 = open('./Logs_35.5_1/gen_coord_2.log', 'w')
-    vehicle_control_writer_2 = open("./Logs_35.5_1/gen_control_obj_2.log", "w")
+    vehicle_location_writer_2 = open('./Logs_26.0_1/gen_coord_2.log', 'w')
+    vehicle_control_writer_2 = open("./Logs_26.0_1/gen_control_obj_2.log", "w")
 
-    timestamp_writer = open('./Logs_35.5_1/gen_timestamps.log', 'w')
-    spoof_timestamp_writer = open('./Logs_35.5_1/spoof_timestamp.log', 'w')
+    timestamp_writer = open('./Logs_26.0_1/gen_timestamps.log', 'w')
+    spoof_timestamp_writer = open('./Logs_26.0_1/spoof_timestamp.log', 'w')
+    jitter_array_writer = open('./Logs_26.0_1/jitter_array.log', 'w')
+    vc_timestamp_writer = open('./Logs_26.0_1/gen_vehicle_control_time.log', 'w')
 
     # Initialize lists to store data
     vehicle_control_obj_1 = []
@@ -413,13 +415,14 @@ def generate_spoof_data_two_car():
     vehicle_location_1 = []
     vehicle_location_2 = []
     spoof_timestamp = []
+    vehicle_control_time = []
 
     # Initialize CAN data logger
     can_handler = CAN_Data_Logger()
 
     time_diff_tick = 0.006
 
-    sim_time_sec = 55 # Duration of simulation in seconds
+    sim_time_sec = 36 # Duration of simulation in seconds
     total_iterations = int(sim_time_sec / time_diff_tick)
 
     jitter_array = generate_jitter_array(0,0.0001,(total_iterations+1000)*14)
@@ -452,6 +455,9 @@ def generate_spoof_data_two_car():
             current_location_1 = vehicle_1.get_location()
             current_location_2 = vehicle_2.get_location()
 
+            vehicle_control_apply_time = timeit.default_timer() - start_time
+            vehicle_control_time.append(vehicle_control_apply_time)
+
             #Application of benign control
             vehicle_1.apply_control(control_1)
             vehicle_2.apply_control(control_2)
@@ -482,7 +488,7 @@ def generate_spoof_data_two_car():
             vehicle_control_obj_2.append(control_2)
 
             # Spoofing Attack in a specific time range
-            if spoof_mode or (current_time >= 35.5 and current_time <= 35.506):
+            if spoof_mode or (current_time >= 26.0 and current_time <= 26.006):
                 spoof_mode = True
                 count_spoof += 1
                 # Check for number of benign timestamp to attack
@@ -497,7 +503,7 @@ def generate_spoof_data_two_car():
 
                 # Apply the spoofed control to the first vehicle in the current tick
                 count = 0
-                control_1.steer = -1.0
+                control_1.steer = 1.0
                 while count < 1:
                     current_timestamp = timeit.default_timer()-start_time
                     spoof_timestamp.append(current_timestamp)
@@ -558,6 +564,15 @@ def generate_spoof_data_two_car():
                 timestamp_writer.write(str(ele)[:9] + '\n')
         timestamp_writer.close()
 
+        for ele in vehicle_control_time:
+            if (ele < 0.000001):
+                vc_timestamp_writer.write("00.000000" + '\n')
+            elif (ele < 10):
+                vc_timestamp_writer.write("0" + str(ele)[:8] + '\n')
+            else:
+                vc_timestamp_writer.write(str(ele)[:9] + '\n')
+        vc_timestamp_writer.close()
+
         for location in vehicle_location_1:
             vehicle_location_writer_1.write(str(location) + "\n")
         vehicle_location_writer_1.close()
@@ -573,10 +588,10 @@ def generate_spoof_data_two_car():
                 spoof_timestamp_writer.write(str(ele)[:12] + '\n')
         spoof_timestamp_writer.close()
 
-        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_35.5_1/plot_throttle_time_1.png", "./Graphs_35.5_1/plot_steer_time_1.png", "./Graphs_35.5_1/plot_brake_time_1.png")
-        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_35.5_1/plot_euclid_diff_gen_index.png', 0, total_iterations)
-        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_35.5_1/gen_coord_1.log", "./Graphs_35.5_1/benign_vs_attack_path.png", 0, total_iterations)
-        plot_spoof_timeline(timestamps, spoof_timestamp, './Graphs_35.5_1/plot_spoof_timeline_combined.png')
+        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_26.0_1/plot_throttle_time_1.png", "./Graphs_26.0_1/plot_steer_time_1.png", "./Graphs_26.0_1/plot_brake_time_1.png")
+        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_26.0_1/plot_euclid_diff_gen_index.png', 0, total_iterations)
+        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_26.0_1/gen_coord_1.log", "./Graphs_26.0_1/benign_vs_attack_path.png", 0, total_iterations)
+        plot_spoof_timeline(timestamps, spoof_timestamp, './Graphs_26.0_1/plot_spoof_timeline_combined.png')
 
         # Rest simulation settings
         settings.synchronous_mode = False

@@ -689,7 +689,6 @@ def replay_dos_data_two_car():
     # Start simulation
     start_time = timeit.default_timer()
     can_handler.start_frame()
-
     try:
         for i in range(len(vehicle_control_obj_1)):  
 
@@ -842,6 +841,255 @@ def replay_dos_data_two_car():
         plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_Replay/plot_euclid_diff_gen_index.png', 0, total_iterations)
         plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_Replay/gen_coord_1.log", "./Graphs_Replay/benign_vs_attack_path.png", 0, total_iterations)
         plot_benign_timeline_near_dos(timestamps, dos_timestamp, './Graphs_Replay/plot_dos_timeline.png')
+
+        # Rest simulation settings
+        settings.synchronous_mode = False
+        world.apply_settings(settings)
+        
+        vehicle_1.destroy()
+        vehicle_2.destroy()
+
+        print("Generation completed and data logged.")
+
+def replay_spoof_data_two_car():
+    # Initialize CARLA client
+    client = carla.Client('localhost', 2000)
+    client.set_timeout(10.0)
+    
+    # Load the map
+    world = client.load_world('Town05_Opt', reset_settings=True, map_layers= carla.MapLayer.NONE)
+    world.load_map_layer(carla.MapLayer.Buildings)
+    world.load_map_layer(carla.MapLayer.Ground)
+    # world = client.get_world()
+
+    # Get spawn points
+    spawn_points = world.get_map().get_spawn_points()
+
+    # Spawn vehicle
+    # car_model_list = get_actor_blueprints(self.world, self._actor_filter, self._actor_generation)
+    # car_model = car_model_list[2]
+    blueprint = world.get_blueprint_library().filter('vehicle.tesla.model3')[0]
+    source = spawn_points[11]
+    vehicle_2 = world.try_spawn_actor(blueprint, source)
+    # modify_vehicle_physics(vehicle_2)
+    world.wait_for_tick()
+    source.location.y -= 25
+    vehicle_1 = world.try_spawn_actor(blueprint, source)
+    # modify_vehicle_physics(vehicle_1)
+    world.wait_for_tick()
+
+    # Configure synchronous simulation
+    settings = world.get_settings()
+    settings.synchronous_mode = True
+    settings.fixed_delta_seconds = 0.008
+    world.apply_settings(settings)
+
+    opt_dict = {'follow_speed_limits': False, 'ignore_traffic_lights': True, 'ignore_stop_signs': True, 'ignore_vehicles': True}
+
+    # agent_1 = BasicAgent(vehicle_1, target_speed=60, opt_dict=opt_dict)
+    # agent_2 = BasicAgent(vehicle_2, target_speed=60, opt_dict=opt_dict)
+    agent_1 = BehaviorAgent(vehicle_1, behavior='normal', opt_dict=opt_dict)
+    agent_2 = BehaviorAgent(vehicle_2, behavior='normal', opt_dict=opt_dict)
+   
+    new_index = 20
+    destination = spawn_points[new_index].location
+    agent_1.set_destination(destination)
+    agent_2.set_destination(destination)
+
+    # Open log files
+    vehicle_location_writer_1 = open('./Logs_Replay/gen_coord_1.log', 'w')
+    vehicle_control_writer_1 = open("./Logs_Replay/gen_control_obj_1.log", "w")
+
+    vehicle_location_writer_2 = open('./Logs_Replay/gen_coord_2.log', 'w')
+    vehicle_control_writer_2 = open("./Logs_Replay/gen_control_obj_2.log", "w")
+
+    timestamp_writer = open('./Logs_Replay/gen_timestamps.log', 'w')
+    spoof_timestamp_writer = open('./Logs_Replay/spoof_timestamp.log', 'w')
+
+    timestamp_reader = open('./Logs_26.0_1/gen_vehicle_control_time.log', 'r')
+
+    vehicle_control_obj_1, queue_170, queue_202, queue_18F, control_timestamps  = convert_can_to_control_data('./Logs_26.0_1/can_data_logs.log')
+    # vehicle_control_obj_1 = extract_control_data('./Logs_25.5_1/gen_control_obj_1.log')
+    vehicle_control_obj_2 = extract_control_data('./Logs_26.0_1/gen_control_obj_2.log')
+
+    # Initialize lists to store data
+    vehicle_control_obj_1 = []
+    vehicle_control_obj_2 = []
+    timestamps = []
+    vehicle_location_1 = []
+    vehicle_location_2 = []
+    spoof_timestamp = []
+
+    # Read timestamps from the generated log file
+    gen_timestamps = [float(line.strip()) for line in timestamp_reader if line.strip()]
+    gen_timestamps.extend(control_timestamps)  # Append control timestamps to the generated timestamps
+    gen_timestamps.sort()  # Sort all timestamps
+
+    # Initialize CAN data logger
+    can_handler = CAN_Data_Logger()
+
+    time_diff_tick = 0.006
+
+    sim_time_sec = 36 # Duration of simulation in seconds
+    total_iterations = int(sim_time_sec / time_diff_tick)
+
+    jitter_array = generate_jitter_array(0,0.0001,(total_iterations+1000)*14)
+
+    spoof_mode = False
+    count_spoof = 0
+    num_spoof_msgs = 39
+    print("Number spoof: ", num_spoof_msgs)
+    spoof_delay = 0.0025859702154545712
+    print("Amount of Delay: ", spoof_delay) 
+
+    # Start simulation
+    start_time = timeit.default_timer()
+    can_handler.start_frame()
+    try:
+        for i in range(total_iterations):  
+
+            # # Get current time
+            # current_time = timeit.default_timer() - start_time
+
+            # # print(str(current_time))
+            # timestamps.append(current_time)
+
+            world.tick()
+
+            # Get current control state
+            control_1 = vehicle_control_obj_1[i]
+            control_2 = agent_2.run_step()
+
+            current_location_1 = vehicle_1.get_location()
+            current_location_2 = vehicle_2.get_location()
+
+            #Application of benign control
+            vehicle_1.apply_control(control_1)
+            vehicle_2.apply_control(control_2)
+
+            light_status, speed = get_status(vehicle_1)
+
+            current_time = timeit.default_timer() - start_time
+
+            while current_time < gen_timestamps[i]:
+                current_time = timeit.default_timer() - start_time
+
+            timestamps.append(current_time)
+
+            can_handler.log_data(
+                    i,
+                    time_diff_tick,
+                    control_1.steer,
+                    control_1.throttle,
+                    control_1.brake,
+                    control_1.gear,
+                    control_1.manual_gear_shift,
+                    light_status["left_blinker_set"],
+                    light_status["right_blinker_set"],
+                    light_status["low_beam_set"],
+                    light_status["high_beam_set"],
+                    light_status["park_lights_set"],
+                    control_1.hand_brake,
+                    speed,
+                    jitter_array
+                )
+
+            #Log Vehicle Control Data  
+            # print(i+1, control_1)
+            # vehicle_control_obj_1.append(control_1)
+            # vehicle_control_obj_2.append(control_2)
+
+            # Spoofing Attack in a specific time range
+            if spoof_mode or (current_time >= 35.5 and current_time <= 35.506):
+                spoof_mode = True
+                count_spoof += 1
+                # Check for number of benign timestamp to attack
+                if count_spoof >= num_spoof_msgs:
+                    spoof_mode = False
+
+                # Add delay to the spoofed control
+                delay_time = current_time + spoof_delay
+                current_timestamp = timeit.default_timer()-start_time
+                while current_timestamp < delay_time:
+                    current_timestamp = timeit.default_timer()-start_time
+
+                # Apply the spoofed control to the first vehicle in the current tick
+                count = 0
+                control_1.steer = 1.0
+                while count < 1:
+                    current_timestamp = timeit.default_timer()-start_time
+                    spoof_timestamp.append(current_timestamp)
+
+                    vehicle_1.apply_control(control_1)
+                    light_status, speed = get_status(vehicle_1)
+
+                    can_handler.log_data(
+                            i,
+                            time_diff_tick,
+                            control_1.steer,
+                            control_1.throttle,
+                            control_1.brake,
+                            control_1.gear,
+                            control_1.manual_gear_shift,
+                            light_status["left_blinker_set"],
+                            light_status["right_blinker_set"],
+                            light_status["low_beam_set"],
+                            light_status["high_beam_set"],
+                            light_status["park_lights_set"],
+                            control_1.hand_brake,
+                            speed,
+                            jitter_array
+                        )
+                    # print(i+1, control_1)
+                    vehicle_control_obj_1.append(control_1)
+
+                    count += 1
+
+            # Logging vehicle location data
+            vehicle_location_1.append(current_location_1)
+            vehicle_location_2.append(current_location_2)
+
+    finally:
+        
+        print("Terminating simulation...")
+        print()
+
+        for control in vehicle_control_obj_1:
+            vehicle_control_writer_1.write(str(control) + "\n")
+        vehicle_control_writer_1.close()
+
+        for control in vehicle_control_obj_2:
+            vehicle_control_writer_2.write(str(control) + "\n")
+        vehicle_control_writer_2.close()
+        
+        for ele in timestamps:
+            if (ele < 0.000001):
+                timestamp_writer.write("00.000000" + '\n')
+            elif (ele < 10):
+                timestamp_writer.write("0" + str(ele)[:8] + '\n')
+            else:
+                timestamp_writer.write(str(ele)[:9] + '\n')
+        timestamp_writer.close()
+
+        for location in vehicle_location_1:
+            vehicle_location_writer_1.write(str(location) + "\n")
+        vehicle_location_writer_1.close()
+
+        for location in vehicle_location_2:
+            vehicle_location_writer_2.write(str(location) + "\n")
+        vehicle_location_writer_2.close()
+
+        for ele in spoof_timestamp:
+            if (ele < 10):
+                spoof_timestamp_writer.write("0" + str(ele)[:11] + '\n')
+            else:
+                spoof_timestamp_writer.write(str(ele)[:12] + '\n')
+        spoof_timestamp_writer.close()
+
+        plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_Replay/plot_throttle_time_1.png", "./Graphs_Replay/plot_steer_time_1.png", "./Graphs_Replay/plot_brake_time_1.png")
+        plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_Replay/plot_euclid_diff_gen_index.png', 0, total_iterations)
+        plot_gen_vs_rep_paths_from_files("./Logs/gen_coord_1.log", "./Logs_Replay/gen_coord_1.log", "./Graphs_Replay/benign_vs_attack_path.png", 0, total_iterations)
+        plot_spoof_timeline(timestamps, spoof_timestamp, './Graphs_Replay/plot_spoof_timeline_combined.png')
 
         # Rest simulation settings
         settings.synchronous_mode = False

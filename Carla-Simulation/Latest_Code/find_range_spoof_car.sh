@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the start and end values for the range
-start_value=35.5
-end_value=35.5
+start_value=26.0
+end_value=26.0
 step=0.00625
 diff=0.006
 
@@ -21,8 +21,8 @@ for lower in "${lower_values[@]}"; do
     upper_values+=("$upper")
 done
 
-echo "Running generate_data_car..."
-./generate_data_car.sh
+# echo "Running generate_data_car..."
+# ./generate_data_car.sh
 
 # Iterate over the range values
 for i in "${!lower_values[@]}"; do

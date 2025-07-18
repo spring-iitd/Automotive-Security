@@ -149,11 +149,11 @@ class CAN_Data_Logger(object):
         self.bus.send(message)
 
     def log_dummy_data_1(self):
-        message = can.Message(arbitration_id=0x00000130, data=[0x00] * 8, is_extended_id=True)
+        message = can.Message(arbitration_id=0x00000170, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
 
     def log_dummy_data_2(self):
-        message = can.Message(arbitration_id=0x00000002, data=[0x00] * 8, is_extended_id=True)
+        message = can.Message(arbitration_id=0x00000202, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
     
     def log_dummy_data_3(self):
@@ -171,50 +171,6 @@ class CAN_Data_Logger(object):
     def log_dummy_data_6(self):
         message = can.Message(arbitration_id=0x000004b1, data=[0x00] * 8, is_extended_id=True)
         self.bus.send(message)
-
-    # def log_data(self, steer_data, throttle_data, brake_data, gear_data, manual_gear_shift, left_blinker, right_blinker, low_beam, high_beam, park_lights, handbrake, speed_data):
-    #     self.log_steer_data(steer_data)
-    #     add_delay(0.00015)
-    #     self.log_throttle_brake_data(throttle_data, brake_data)
-    #     add_delay(0.00015)
-    #     self.log_gear_data(gear_data, manual_gear_shift)
-    #     add_delay(0.00015)
-    #     self.log_blinker_data(left_blinker, right_blinker)
-    #     add_delay(0.00015)
-    #     self.log_headlight_data(low_beam, high_beam)
-    #     add_delay(0.00015)
-    #     self.log_beam_data(low_beam, high_beam, park_lights)
-    #     add_delay(0.00015)
-    #     self.log_handbrake_data(handbrake)
-    #     add_delay(0.00015)
-    #     self.log_speed_data(speed_data)
-    #     add_delay(0.00015)
-
-    # def log_data(self, index, time_diff_tick, steer_data, throttle_data, brake_data, gear_data, manual_gear_shift, left_blinker, right_blinker, low_beam, high_beam, park_lights, handbrake, speed_data):
-    #     count_1 = int(0.5/time_diff_tick)
-    #     count_2 = int(1/time_diff_tick) 
-    #     # print(count_1, count_2)
-
-    #     self.log_steer_data(steer_data)
-    #     add_delay(0.00015)
-    #     self.log_throttle_brake_data(throttle_data, brake_data)
-    #     add_delay(0.00015)
-    #     self.log_speed_data(speed_data)
-    #     add_delay(0.00015)
-
-    #     if index%count_1 == 0:
-    #         self.log_gear_data(gear_data, manual_gear_shift)
-    #         add_delay(0.00015)
-
-    #     if index%count_2 == 0:
-    #         self.log_blinker_data(left_blinker, right_blinker)
-    #         add_delay(0.00015)
-    #         self.log_headlight_data(low_beam, high_beam)
-    #         add_delay(0.00015)
-    #         self.log_beam_data(low_beam, high_beam, park_lights)
-    #         add_delay(0.00015)
-    #         self.log_handbrake_data(handbrake)
-    #         add_delay(0.00015)
         
     def log_data(self, index, time_diff_tick, steer_data, throttle_data, brake_data, gear_data,
              manual_gear_shift, left_blinker, right_blinker, low_beam, high_beam,
@@ -425,13 +381,15 @@ def generate_spoof_data_two_car():
     sim_time_sec = 36 # Duration of simulation in seconds
     total_iterations = int(sim_time_sec / time_diff_tick)
 
-    jitter_array = generate_jitter_array(0,0.0001,(total_iterations+1000)*14)
+    jitter_array = generate_jitter_array(0,100,(total_iterations+1000)*14)
 
     spoof_mode = False
     count_spoof = 0
     num_spoof_msgs = random.randint(0,150)
+    num_spoof_msgs = 1
     print("Number spoof: ", num_spoof_msgs)
     spoof_delay = random.uniform(0.0, 0.0050)
+    spoof_delay = 0.0025
     print("Amount of Delay: ", spoof_delay) 
 
     # Start simulation
@@ -443,9 +401,8 @@ def generate_spoof_data_two_car():
             # Get current time
             current_time = timeit.default_timer() - start_time
 
-            # print(str(current_time))
             timestamps.append(current_time)
-
+        
             world.tick()
 
             # Get current control state
@@ -483,7 +440,6 @@ def generate_spoof_data_two_car():
                 )
 
             #Log Vehicle Control Data  
-            # print(i+1, control_1)
             vehicle_control_obj_1.append(control_1)
             vehicle_control_obj_2.append(control_2)
 
@@ -503,33 +459,33 @@ def generate_spoof_data_two_car():
 
                 # Apply the spoofed control to the first vehicle in the current tick
                 count = 0
-                control_1.steer = 1.0
+                control = carla.VehicleControl(throttle=control_1.throttle, steer=1.0, brake=control_1.brake, gear=0)
                 while count < 1:
                     current_timestamp = timeit.default_timer()-start_time
                     spoof_timestamp.append(current_timestamp)
 
-                    vehicle_1.apply_control(control_1)
+                    vehicle_1.apply_control(control)
                     light_status, speed = get_status(vehicle_1)
 
                     can_handler.log_data(
                             i,
                             time_diff_tick,
-                            control_1.steer,
-                            control_1.throttle,
-                            control_1.brake,
-                            control_1.gear,
-                            control_1.manual_gear_shift,
+                            control.steer,
+                            control.throttle,
+                            control.brake,
+                            control.gear,
+                            control.manual_gear_shift,
                             light_status["left_blinker_set"],
                             light_status["right_blinker_set"],
                             light_status["low_beam_set"],
                             light_status["high_beam_set"],
                             light_status["park_lights_set"],
-                            control_1.hand_brake,
+                            control.hand_brake,
                             speed,
                             jitter_array
                         )
-                    # print(i+1, control_1)
-                    vehicle_control_obj_1.append(control_1)
+                   
+                    vehicle_control_obj_1.append(control)
 
                     count += 1
 
@@ -556,7 +512,7 @@ def generate_spoof_data_two_car():
         vehicle_control_writer_2.close()
         
         for ele in timestamps:
-            if (ele < 0.000001):
+            if (ele < 0.0001):
                 timestamp_writer.write("00.000000" + '\n')
             elif (ele < 10):
                 timestamp_writer.write("0" + str(ele)[:8] + '\n')
@@ -587,6 +543,10 @@ def generate_spoof_data_two_car():
             else:
                 spoof_timestamp_writer.write(str(ele)[:12] + '\n')
         spoof_timestamp_writer.close()
+
+        for ele in jitter_array:
+            jitter_array_writer.write(str(ele) + '\n')
+        jitter_array_writer.close()
 
         plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_26.0_1/plot_throttle_time_1.png", "./Graphs_26.0_1/plot_steer_time_1.png", "./Graphs_26.0_1/plot_brake_time_1.png")
         plot_euclid_diff_by_index_only(vehicle_location_1, vehicle_location_2,'./Logs', './Graphs_26.0_1/plot_euclid_diff_gen_index.png', 0, total_iterations)

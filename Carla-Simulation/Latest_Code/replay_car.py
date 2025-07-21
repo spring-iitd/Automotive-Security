@@ -906,7 +906,8 @@ def replay_spoof_data_two_car():
     timestamp_writer = open('./Logs_Replay/gen_timestamps.log', 'w')
     spoof_timestamp_writer = open('./Logs_Replay/spoof_timestamp.log', 'w')
 
-    timestamp_reader = open('./Logs_26.0_1/gen_vehicle_control_time.log', 'r')
+    timestamp_reader = open('./Logs_36.0_1/gen_vehicle_control_time.log', 'r')
+    spoof_timestamp_reader = open('./Logs_36.0_1/spoof_timestamp.log', 'r')
 
     # Initialize lists to store data
     vehicle_control_obj_1 = []
@@ -915,38 +916,44 @@ def replay_spoof_data_two_car():
     vehicle_location_1 = []
     vehicle_location_2 = []
     spoof_timestamp = []
+    # temp_control_obj = []
 
-    vehicle_control_obj_1, queue_170, queue_202, queue_18F, control_timestamps  = convert_can_to_control_data('./Logs_26.0_1/can_data_logs.log')
-    vehicle_control_obj_1 = extract_control_data('./Logs_26.0_1/gen_control_obj_1.log')
-    vehicle_control_obj_2 = extract_control_data('./Logs_26.0_1/gen_control_obj_2.log')
+    stored_control_obj_1, queue_170, queue_202, queue_18F, control_timestamps  = convert_can_to_control_data('./Logs_36.0_1/can_data_logs.log')
+    # stored_control_obj_1 = extract_control_data('./Logs_36.0_1/gen_control_obj_1.log')
+    stored_control_obj_2 = extract_control_data('./Logs_36.0_1/gen_control_obj_2.log')
 
     # Read timestamps from the generated log file
     gen_timestamps = [float(line.strip()) for line in timestamp_reader if line.strip()]
     gen_timestamps.extend(control_timestamps)  # Append control timestamps to the generated timestamps
     gen_timestamps.sort()  # Sort all timestamps
 
+    gen_spoof_timestamps = [float(line.strip()) for line in spoof_timestamp_reader if line.strip()]
+
     # Initialize CAN data logger
     can_handler = CAN_Data_Logger()
 
     time_diff_tick = 0.006
 
-    sim_time_sec = 36 # Duration of simulation in seconds
+    sim_time_sec = 42.0 # Duration of simulation in seconds
     total_iterations = int(sim_time_sec / time_diff_tick)
 
-    jitter_array = read_jitter_array('./Logs_26.0_1/jitter_array.log')
+    jitter_array = read_jitter_array('./Logs_36.0_1/jitter_array.log')
 
     spoof_mode = False
     count_spoof = 0
-    num_spoof_msgs = 1
+    num_spoof_msgs = 50
     print("Number spoof: ", num_spoof_msgs)
     spoof_delay = 0.0025 # Delay for spoofed control in seconds
     print("Amount of Delay: ", spoof_delay) 
+
+    i = 0
+    j = 0
 
     # Start simulation
     start_time = timeit.default_timer()
     can_handler.start_frame()
     try:
-        for i in range(total_iterations):  
+        while j < total_iterations:  
 
             # # Get current time
             # current_time = timeit.default_timer() - start_time
@@ -957,15 +964,17 @@ def replay_spoof_data_two_car():
             world.tick()
 
             # Get current control state
-            control_1 = vehicle_control_obj_1[i]
+            control_1 = stored_control_obj_1[i]
             control_2 = agent_2.run_step()
+
+            i += 1
 
             current_location_1 = vehicle_1.get_location()
             current_location_2 = vehicle_2.get_location()
 
             current_time = timeit.default_timer() - start_time
 
-            while current_time < gen_timestamps[i]:
+            while current_time < gen_timestamps[j]:
                 current_time = timeit.default_timer() - start_time
 
             timestamps.append(current_time)
@@ -997,11 +1006,11 @@ def replay_spoof_data_two_car():
 
             #Log Vehicle Control Data  
             # print(i+1, control_1)
-            # vehicle_control_obj_1.append(control_1)
-            # vehicle_control_obj_2.append(control_2)
+            vehicle_control_obj_1.append(control_1)
+            vehicle_control_obj_2.append(control_2)
 
             # Spoofing Attack in a specific time range
-            if spoof_mode or (current_time >= 26.0 and current_time <= 26.006):
+            if spoof_mode or (current_time >= 36.0 and current_time <= 36.006):
                 spoof_mode = True
                 count_spoof += 1
                 # Check for number of benign timestamp to attack
@@ -1009,49 +1018,56 @@ def replay_spoof_data_two_car():
                     spoof_mode = False
 
                 # Add delay to the spoofed control
-                delay_time = current_time + spoof_delay
-                current_timestamp = timeit.default_timer()-start_time
-                while current_timestamp < delay_time:
-                    current_timestamp = timeit.default_timer()-start_time
+                # delay_time = current_time + spoof_delay
+                # current_timestamp = timeit.default_timer()-start_time
+                # while current_timestamp < delay_time:
+                #     current_timestamp = timeit.default_timer()-start_time
 
                 # Apply the spoofed control to the first vehicle in the current tick
                 count = 0
                 # control_1.steer = 1.0
+                
+                control = stored_control_obj_1[i]
                 i += 1
-                control_1 = vehicle_control_obj_1[i]
                 while count < 1:
                     current_timestamp = timeit.default_timer()-start_time
+                    while current_timestamp < gen_spoof_timestamps[count_spoof-1]:
+                        current_timestamp = timeit.default_timer() - start_time
+
                     spoof_timestamp.append(current_timestamp)
 
-                    vehicle_1.apply_control(control_1)
+                    vehicle_1.apply_control(control)
                     light_status, speed = get_status(vehicle_1)
 
                     can_handler.log_data(
                             i,
                             time_diff_tick,
-                            control_1.steer,
-                            control_1.throttle,
-                            control_1.brake,
-                            control_1.gear,
-                            control_1.manual_gear_shift,
+                            control.steer,
+                            control.throttle,
+                            control.brake,
+                            control.gear,
+                            control.manual_gear_shift,
                             light_status["left_blinker_set"],
                             light_status["right_blinker_set"],
                             light_status["low_beam_set"],
                             light_status["high_beam_set"],
                             light_status["park_lights_set"],
-                            control_1.hand_brake,
+                            control.hand_brake,
                             speed,
                             jitter_array,
                             queue_170, queue_202, queue_18F
                         )
                     # print(i+1, control_1)
-                    vehicle_control_obj_1.append(control_1)
+                    vehicle_control_obj_1.append(control)
 
                     count += 1
 
             # Logging vehicle location data
             vehicle_location_1.append(current_location_1)
             vehicle_location_2.append(current_location_2)
+
+            # Increment iteration
+            j += 1
 
     finally:
         
@@ -1085,9 +1101,9 @@ def replay_spoof_data_two_car():
 
         for ele in spoof_timestamp:
             if (ele < 10):
-                spoof_timestamp_writer.write("0" + str(ele)[:11] + '\n')
+                spoof_timestamp_writer.write("0" + str(ele)[:8] + '\n')
             else:
-                spoof_timestamp_writer.write(str(ele)[:12] + '\n')
+                spoof_timestamp_writer.write(str(ele)[:9] + '\n')
         spoof_timestamp_writer.close()
 
         plot_vc_time(vehicle_control_obj_1, timestamps, "./Graphs_Replay/plot_throttle_time_1.png", "./Graphs_Replay/plot_steer_time_1.png", "./Graphs_Replay/plot_brake_time_1.png")

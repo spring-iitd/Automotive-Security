@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define the start and end values for the range
-start_value=26.0
-end_value=26.0
+start_value=36.0
+end_value=36.0
 step=0.00625
 diff=0.006
 

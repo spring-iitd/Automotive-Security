@@ -46,7 +46,7 @@ main() {
     createFolders
     clearTmpFiles
     startCanDump
-    createEmptyDoSTrafficFile
+    # createEmptyDoSTrafficFile
     runGenLogScript
     killCanDump
     postProcessLogs

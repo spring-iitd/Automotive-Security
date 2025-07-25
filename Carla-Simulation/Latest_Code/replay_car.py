@@ -156,17 +156,29 @@ class CAN_Data_Logger(object):
         self.bus.send(message)
 
     def log_dummy_data_1(self, queue_170):
-        data = queue_170.popleft()
+        data=[0x00] * 8
+        if len(queue_170) == 0:
+            data[0] = random.randint(0, 255)
+        else:
+            data = queue_170.popleft()
         message = can.Message(arbitration_id=0x00000170, data=data, is_extended_id=True)
         self.bus.send(message)
 
     def log_dummy_data_2(self, queue_202):
-        data = queue_202.popleft()
+        data=[0x00] * 8
+        if len(queue_202) == 0:
+            data[1] = random.randint(0, 255)
+        else:
+            data = queue_202.popleft()
         message = can.Message(arbitration_id=0x00000202, data=data, is_extended_id=True)
         self.bus.send(message)
     
     def log_dummy_data_3(self, queue_18F):
-        data = queue_18F.popleft()
+        data=[0x00] * 8
+        if len(queue_18F) == 0:
+            data[2] = random.randint(0, 255)
+        else:
+            data = queue_18F.popleft()
         message = can.Message(arbitration_id=0x0000018f, data=data, is_extended_id=True)
         self.bus.send(message)
 
@@ -256,9 +268,22 @@ class CAN_Data_Logger(object):
     
     def convert_to_CAN_msg(self, line):
         # print(line)
-        can_id = line.split()[2]
+        parts = line.strip().split()
+        timestamp_str = parts[0]
+        can_id = parts[2]
         can_data = line.split("[8]")[1].replace(" ", "")
-        can_msg = can.Message(arbitration_id=int(can_id, 16), data=bytearray.fromhex(can_data))
+
+        can_msg = can.Message(
+            arbitration_id=int(can_id, 16),
+            data=bytearray.fromhex(can_data)
+        )
+
+        # Extract timestamp from "(000.123456)"
+        if timestamp_str.startswith("(") and timestamp_str.endswith(")"):
+            can_msg.timestamp = float(timestamp_str[1:-1])
+        else:
+            can_msg.timestamp = 0.0
+
         return can_msg
 
     def __del__(self):
@@ -536,8 +561,8 @@ def convert_can_to_control_data(file_path):
                 if can_id == 0x14A:
                     # Steer message
                     if current_group['14A']:
-                        control_timestamps.append(msg.timestamp)  # Store timestamp for control
-                        control = add_control_obj(msg, current_group['17C'])
+                        control_timestamps.append(current_group['14A'].timestamp)  # Store timestamp for control
+                        control = add_control_obj(current_group['14A'], current_group['17C'])
                         if control:
                             last_control = control
                     current_group['14A'] = msg
@@ -545,8 +570,8 @@ def convert_can_to_control_data(file_path):
                 elif can_id == 0x17C:
                     # Throttle message
                     if current_group['17C']:
-                        control_timestamps.append(msg.timestamp)  # Store timestamp for control
-                        control = add_control_obj(current_group['14A'], msg)
+                        control_timestamps.append(current_group['17C'].timestamp)  # Store timestamp for control
+                        control = add_control_obj(current_group['14A'], current_group['17C'])
                         if control:
                             last_control = control
                     current_group['17C'] = msg
@@ -926,6 +951,7 @@ def replay_spoof_data_two_car():
     gen_timestamps = [float(line.strip()) for line in timestamp_reader if line.strip()]
     gen_timestamps.extend(control_timestamps)  # Append control timestamps to the generated timestamps
     gen_timestamps.sort()  # Sort all timestamps
+    # print(gen_timestamps)
 
     gen_spoof_timestamps = [float(line.strip()) for line in spoof_timestamp_reader if line.strip()]
 
@@ -953,7 +979,7 @@ def replay_spoof_data_two_car():
     start_time = timeit.default_timer()
     can_handler.start_frame()
     try:
-        while j < total_iterations:  
+        while i < len(stored_control_obj_1):  
 
             # # Get current time
             # current_time = timeit.default_timer() - start_time
@@ -964,6 +990,7 @@ def replay_spoof_data_two_car():
             world.tick()
 
             # Get current control state
+            # print(f"Current index: {i}, j: {j}, control object: {str(stored_control_obj_1[i])}")
             control_1 = stored_control_obj_1[i]
             control_2 = agent_2.run_step()
 
@@ -973,7 +1000,7 @@ def replay_spoof_data_two_car():
             current_location_2 = vehicle_2.get_location()
 
             current_time = timeit.default_timer() - start_time
-
+            # print(f"Current time: {current_time:.6f} seconds, Generated timestamp: {gen_timestamps[j]:.6f} seconds")
             while current_time < gen_timestamps[j]:
                 current_time = timeit.default_timer() - start_time
 
@@ -1027,6 +1054,7 @@ def replay_spoof_data_two_car():
                 count = 0
                 # control_1.steer = 1.0
                 
+                # print(f"Current index: {i}, j: {j}, control object: {str(stored_control_obj_1[i])}")
                 control = stored_control_obj_1[i]
                 i += 1
                 while count < 1:

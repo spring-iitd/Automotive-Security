@@ -1,6 +1,7 @@
 import sys
 import os 
 
+from evaluate import *
 from ids.base import IDS
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'features')))
 from features import feature_extractor
@@ -36,22 +37,22 @@ class Densenet161(IDS):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.model = models.densenet161(weights=models.DenseNet161_Weights.DEFAULT)
         self.model.classifier = nn.Linear(self.model.classifier.in_features, 2)
-        if FEATURE_EXTRACTION:
-            self.extract_features()
 
     def train(self, X_train=None, Y_train=None, **kwargs):
-        print("Entered into model's training method")
+        
         # super().train(X_train, Y_train)
         
 
         # Load the test and train datasets from multiple folders
         dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
         train_dataset_dir = os.path.join(dataset_path, "train", TRAIN_DATASET_DIR)
-        train_label_file = os.path.join(train_dataset_dir, TRAIN_DATASET_LABEL)
+        train_label_file = os.path.join(train_dataset_dir, "labels.txt")
         train_loader = self.load_dataset(train_dataset_dir, train_label_file, is_train=True)
+        print("train dataset dir : ", train_dataset_dir)
+        print("Label file train : ", train_label_file)
         print("Loaded train dataset")
     
-        epochs = 7   # default
+        epochs = EPOCHS   # default
 
         # Train the model
         model = self.train_model(train_loader, self.device, self.model, epochs)
@@ -68,21 +69,25 @@ class Densenet161(IDS):
         dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
         test_dataset_dir = os.path.join(dataset_path, "test", TEST_DATASET_DIR)
         # print(f"Test Dataset dir : {test_dataset_dir}")
-        test_label_file = os.path.join(test_dataset_dir, TEST_DATASET_LABEL)
+        test_label_file = os.path.join(test_dataset_dir, "labels.txt")
         # print(f"Test label file : {test_label_file}")
         test_loader = self.load_dataset(test_dataset_dir, test_label_file,is_train=False)
         print("Loaded test dataset")
 
         all_preds, all_labels = self.test_model(test_loader, self.device, self.model )
-        IDS_accu, IDS_prec, IDS_recall,IDS_F1 = self.evaluation_metrics(all_preds, all_labels)
-        print("----------------IDS Perormance Metric----------------")
-        print(f'Accuracy: {IDS_accu:.4f}')
-        print(f'Precision: {IDS_prec:.4f}')
-        print(f'Recall: {IDS_recall:.4f}')
-        print(f'F1 Score: {IDS_F1:.4f}')    
+        evaluation_metrics(all_preds, all_labels)
+        # IDS_accu, IDS_prec, IDS_recall,IDS_F1 = self.evaluation_metrics(all_preds, all_labels)
+        # print("----------------IDS Perormance Metric----------------")
+        # print(f'Accuracy: {IDS_accu:.4f}')
+        # print(f'Precision: {IDS_prec:.4f}')
+        # print(f'Recall: {IDS_recall:.4f}')
+        # print(f'F1 Score: {IDS_F1:.4f}')    
 
+    # def save(self, path):
+    #     torch.save(self.model.state_dict(), path)
+    #     "Model saved"
     def save(self, path):
-        torch.save(self.model.state_dict(), path)
+        torch.save(self.model, path)
         "Model saved"
  
 
@@ -91,15 +96,16 @@ class Densenet161(IDS):
 
     def load(self, path):
         # self.model.load_state_dict(torch.load(path,map_location=torch.device('cpu'), weights_only='True'))
-        state_dict = torch.load(path, map_location=self.device, weights_only=True)
-        self.model.load_state_dict(state_dict)
+        # state_dict = torch.load(path, map_location=self.device, weights_only=True)
+        # self.model.load_state_dict(state_dict)
+        self.model = torch.load(path)
         self.model.to(self.device)
 
 
-    def extract_features(self,X=None,Y=None):
-        # extract_feature_images.image_as_feature()
-        # other_features.extract_features()
-        feature_extractor.extract_features()
+    # def extract_features(self,X=None,Y=None):
+    #     # extract_feature_images.image_as_feature()
+    #     # other_features.extract_features()
+    #     feature_extractor.extract_features()
 
     def evaluation_metrics(self, all_preds, all_labels):
  
@@ -143,8 +149,11 @@ class Densenet161(IDS):
         labels = {}
         with open(label_file, 'r') as file:
             for line in file:
+                # print("LINE : ", line)
                 filename, label = line.strip().replace("'", "").replace('"', '').split(': ')
-                labels[filename.strip()] = int(label.strip())
+                # print("FILENAME : ", filename, "Label : ", label.strip().split()[1])
+
+                labels[filename.strip()] = int(label.strip().split()[1])
         return labels
     
     def load_dataset(self, data_dir, label_file, is_train):

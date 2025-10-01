@@ -3,6 +3,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 import joblib
 from config import *
+import sys
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'features')))
 from features import feature_extractor
 
 class RandomForest(IDS):

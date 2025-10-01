@@ -1,3 +1,4 @@
+from evaluate import evaluation_metrics
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -11,8 +12,14 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, accuracy_score
- 
+from config import *
+
+import sys
+import os 
+
+from features.image import extract_feature_images
 from ids.base import IDS
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'features')))
 from features import feature_extractor
 from features.image import *
 from config import *
@@ -25,21 +32,19 @@ class ResNet(IDS):
         self.model = InceptionResNetV1(num_classes=2).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.0001)
         self.criterion = nn.CrossEntropyLoss()
-        if FEATURE_EXTRACTION:
-            self.extract_features()
+ 
 
     def train(self, X_train=None, Y_train=None, **kwargs):
-        print("Entered into model's training method")
         # super().train(X_train, Y_train)
 
         # Load the test and train datasets from multiple folders
         dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
         train_dataset_dir = os.path.join(dataset_path, "train", TRAIN_DATASET_DIR)
-        train_label_file = os.path.join(train_dataset_dir, TRAIN_DATASET_LABEL)
+        train_label_file = os.path.join(train_dataset_dir, "labels.txt")
         train_loader = self.load_dataset(train_dataset_dir, train_label_file, is_train=True)
         print("Loaded train dataset")
     
-        epochs = 200   # default
+        epochs = EPOCHS   # default
 
         # Train the model
         model = self.train_wisa(self.model, self.device, train_loader, self.optimizer, self.criterion, epochs)
@@ -53,38 +58,44 @@ class ResNet(IDS):
         dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
         test_dataset_dir = os.path.join(dataset_path, "test", TEST_DATASET_DIR)
         # print(f"Test Dataset dir : {test_dataset_dir}")
-        test_label_file = os.path.join(test_dataset_dir, TEST_DATASET_LABEL)
+        test_label_file = os.path.join(test_dataset_dir, "labels.txt")
         # print(f"Test label file : {test_label_file}")
         test_loader = self.load_dataset(test_dataset_dir, test_label_file,is_train=False)
         print("Loaded test dataset")
 
         all_preds, all_labels = self.test_wisa(self.model, self.device, test_loader, self.criterion)
-        tnr, mdr, oa_asr, IDS_accu, IDS_prec, IDS_recall,IDS_F1 = self.evaluation_metrics(all_preds, all_labels)
+        # tnr, mdr, oa_asr, IDS_accu, IDS_prec, IDS_recall,IDS_F1 = self.evaluation_metrics(all_preds, all_labels)
+        evaluation_metrics(all_preds, all_labels)
 
-        print("----------------IDS Perormance Metric----------------")
-        print(f'Accuracy: {IDS_accu:.4f}')
-        print(f'Precision: {IDS_prec:.4f}')
-        print(f'Recall: {IDS_recall:.4f}')
-        print(f'F1 Score: {IDS_F1:.4f}')    
+        # print("----------------IDS Perormance Metric----------------")
+        # print(f'Accuracy: {IDS_accu:.4f}')
+        # print(f'Precision: {IDS_prec:.4f}')
+        # print(f'Recall: {IDS_recall:.4f}')
+        # print(f'F1 Score: {IDS_F1:.4f}')    
     
 
+    # def save(self, path):
+    #     torch.save(self.model.state_dict(), path)
+    #     "Model saved"
     def save(self, path):
-        torch.save(self.model.state_dict(), path)
+        torch.save(self.model, path)
         "Model saved"
  
 
     def predict(self, X_test):
         super().predict(X_test)
 
+
     def load(self, path):
         # self.model.load_state_dict(torch.load(path,map_location=torch.device('cpu'), weights_only='True'))
-        state_dict = torch.load(path, map_location=self.device, weights_only=True)
-        self.model.load_state_dict(state_dict)
+        # state_dict = torch.load(path, map_location=self.device, weights_only=True)
+        # self.model.load_state_dict(state_dict)
+        self.model = torch.load(path)
         self.model.to(self.device)
 
-    def extract_features(self,X=None,Y=None):
-        # extract_feature_images.image_as_feature()
-        feature_extractor.extract_features()
+    # def extract_features(self,X=None,Y=None):
+    #     # extract_feature_images.image_as_feature()
+    #     feature_extractor.extract_features()
     
     def evaluation_metrics(self, all_preds, all_labels):
  
@@ -136,7 +147,7 @@ class ResNet(IDS):
         with open(label_file, 'r') as file:
             for line in file:
                 filename, label = line.strip().replace("'", "").replace('"', '').split(': ')
-                labels[filename.strip()] = int(label.strip())
+                labels[filename.strip()] = int(label.strip().split()[1])
         return labels
 
     def load_dataset(self, data_dir, label_file, is_train):
@@ -165,40 +176,41 @@ class ResNet(IDS):
         return data_loader
     
     
-    def train_wisa(self, model, device, train_loader, optimizer, criterion, epoch):
+    def train_wisa(self, model, device, train_loader, optimizer, criterion, epochs):
         model.train()
         correct = 0
         total = 0
         running_loss = 0
-    
-        for batch_idx, (data, target) in enumerate(train_loader):
-            data, target = data.to(device), target.to(device)
-            optimizer.zero_grad()
-            output = model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
+        for epoch in range(1, epochs + 1):
+            for batch_idx, (data, target) in enumerate(train_loader):
+                data, target = data.to(device), target.to(device)
+                optimizer.zero_grad()
+                output = model(data)
+                loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
+            
+                # Track running loss
+                running_loss += loss.item()
+            
+                # Calculate accuracy
+                pred = output.argmax(dim=1, keepdim=False)  # Get the predicted class
+                correct += pred.eq(target).sum().item()
+                total += target.size(0)
         
-            # Track running loss
-            running_loss += loss.item()
-        
-            # Calculate accuracy
-            pred = output.argmax(dim=1, keepdim=False)  # Get the predicted class
-            correct += pred.eq(target).sum().item()
-            total += target.size(0)
-    
-            #if batch_idx % 10_000 == 0:  # Adjust this to suit your dataset size
-            accuracy = 100. * correct / total
-            print(f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] "
-                    f"Loss: {loss.item():.6f} Accuracy: {accuracy:.2f}%")
+                #if batch_idx % 10_000 == 0:  # Adjust this to suit your dataset size
+                accuracy = 100. * correct / total
+                print(f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] "
+                        f"Loss: {loss.item():.6f} Accuracy: {accuracy:.2f}%")
     
         print("Training complete!")
         # torch.save(model.state_dict(), model_path)
     
         # Print overall training loss and accuracy for the epoch
         overall_accuracy = 100. * correct / len(train_loader.dataset)
-        print(f"Epoch {epoch} Summary: Average Loss: {running_loss / len(train_loader):.6f}, "
-            f"Accuracy: {overall_accuracy:.2f}%")
+        # print(f"Epoch {epoch} Summary: Average Loss: {running_loss / len(train_loader):.6f}, "
+        #     f"Accuracy: {overall_accuracy:.2f /epochs }%")
+        
     
         return model
     
@@ -364,4 +376,3 @@ class InceptionResNetV1(nn.Module):
         x = self.dropout(x)
         x = self.fc(x)
         return F.log_softmax(x, dim = 1)
- 

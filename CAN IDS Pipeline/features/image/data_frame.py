@@ -4,6 +4,11 @@ import pandas as pd
 import numpy as np
 from config import *
  
+import json
+import re
+import pandas as pd
+import numpy as np
+
 def calculate_crc(data):
     """
     Calculate CRC-15 checksum for the given data.
@@ -13,25 +18,25 @@ def calculate_crc(data):
        CRC-15 checksum.
     """
     crc = 0x0000
- 
+
     # CRC-15 polynomial
     poly = 0x4599
 
     for bit in data:
         # XOR with the current bit shifted left by 14 bits
         crc ^= (int(bit) & 0x01) << 14
- 
+
         for _ in range(15):
             if crc & 0x8000:
                 crc = (crc << 1) ^ poly
             else:
                 crc <<= 1
- 
+
         # Ensuring 15 bits
         crc &= 0x7FFF
- 
+
     return crc
- 
+
 def stuff_bits(binary_string):
     """
     Inserting '1' after every 5 consecutive '0's in the binary string.
@@ -40,20 +45,22 @@ def stuff_bits(binary_string):
     Returns:
         str: Binary string after stuffing.
     """
+
+    return binary_string            # early return to avoid bit stuffing
     result = ''
- 
+
     # Initialize a count for consecutive 0's
     count = 0
- 
+
     for bit in binary_string:
- 
+
         # Appending the current bit to the result string
         result += bit
-       
+        
         # Incrementing the count if the current bit is 0
         if bit == '0':
             count += 1
-           
+            
             # Inserting a 1 after 5 consecutive 0's
             if count == 5:
                 result += '1'
@@ -62,9 +69,10 @@ def stuff_bits(binary_string):
         else:
             # Reseting the count if the current bit is not 0
             count = 0
- 
+
     return result
- 
+
+# Not used
 def destuff_bits(binary_string):
     """
     Removing '1' inserted after every 5 consecutive '0's in the binary string.
@@ -75,7 +83,7 @@ def destuff_bits(binary_string):
     """
     result = ''
     count = 0
- 
+
     i = 0
     while i < len(binary_string):
         bit = binary_string[i]
@@ -90,9 +98,9 @@ def destuff_bits(binary_string):
         else:
             count = 0
         i += 1
- 
+
     return result
- 
+
 def hex_to_bits(hex_value, num_bits):
     """
     Convert hexadecimal value to binary string with specified number of bits.
@@ -103,55 +111,57 @@ def hex_to_bits(hex_value, num_bits):
         str: Binary string representation of the hexadecimal value.
     """
     return bin(int(hex_value, 16))[2:].zfill(num_bits)
- 
+
 # def shift_columns(df):
-   
+    
 #     for dlc in [2,4,5,6]:
 #         print("Here")
 #         df.loc[df['dlc'] == dlc, df.columns[3:]] = df.loc[df['dlc'] == dlc, df.columns[3:]].shift(periods=8-dlc, axis='columns', fill_value='00')
- 
+
 #     return df
- 
+
 def shift_columns(df):
- 
-    for dlc in [2,5,6]:
- 
+
+    for dlc in [1,2,3,4,5,6,7]:
+
         df.loc[df['dlc'] == dlc, df.columns[3:]] = df.loc[df['dlc'] == dlc, df.columns[3:]].shift(periods=8-dlc, axis='columns', fill_value='00')
     print(df)
     return df
- 
+
 def pre_process_attack_data(data_path,output_path):
-   
-    columns = ['timestamp','can_id', 'dlc', 'data0', 'data1', 'data2', 'data3', 'data4',
+    
+    columns = ['timestamp','can_id', 'dlc', 'data0', 'data1', 'data2', 'data3', 'data4', 
            'data5', 'data6', 'data7', 'flag']
-   
+    
     data = pd.read_csv(data_path, names=columns, header=None)
     # print("before shifting",data)
     data = data.replace(np.NaN, '00')
     data = shift_columns(data)
     # print("after shifting",data)
-    ##Replacing all NaNs with '00'
+    ##Replacing all NaNs with '00' 
     data = data.replace(np.NaN, '00')
     data.to_csv(output_path, index=False,header=False)
- 
+
+# not used
 def split_csv(data_path, output_path1, output_path2):
     # Load the CSV file
-    columns = ['timestamp','can_id', 'dlc', 'data0', 'data1', 'data2', 'data3', 'data4',
+    columns = ['timestamp','can_id', 'dlc', 'data0', 'data1', 'data2', 'data3', 'data4', 
            'data5', 'data6', 'data7', 'flag']
+    
     data = pd.read_csv(data_path, names = columns, dtype=str, low_memory=False)
     # print("data before split",data)
- 
+
     # Split the data into two halves
     mid_index = len(data) // 2
     data_A = data.iloc[:mid_index]
     data_B = data.iloc[mid_index:]
     # print(data_A)
     # print(data_B)
-   
+    
     # Save the two halves to new CSV files
     data_A.to_csv(output_path1, index=False,header=False)
     data_B.to_csv(output_path2, index=False, header=False)
- 
+
 def convert_to_binary_string(can_id, dlc, data):
     """
     Converting CAN frame components to a binary string according to the CAN protocol.
@@ -162,7 +172,7 @@ def convert_to_binary_string(can_id, dlc, data):
     Returns:
         str: Binary string representing the formatted CAN frame.
     """
- 
+
     # Start of Frame (SOF) bit
     start_of_frame = '0'
  
@@ -181,10 +191,10 @@ def convert_to_binary_string(can_id, dlc, data):
  
     # Converting Data Length Code (DLC) to 4-bit binary representation
     dlc_bits = bin(dlc)[2:].zfill(4)
-   
-   
+    
+    
     # Convert data bytes to binary representation
-   
+    
     if dlc:
         if data[0] != '':
             data_bits = ''.join(hex_to_bits(hex_byte, 8) for hex_byte in data)
@@ -192,11 +202,14 @@ def convert_to_binary_string(can_id, dlc, data):
             data_bits = ''
     else:
         data_bits = ''
-   
+    
     # print(data_bits)
     # Filling missing data bytes with zeros
     padding_bits = '0' * (8 * (8 - dlc))
-    data_bit_total = data_bits + padding_bits
+
+    # data_bit_total = data_bits + padding_bits
+    # data_bit_total = padding_bits + data_bits 
+    data_bit_total = data_bits
  
     # Calculating CRC-15 checksum and converting to binary representation
     crc_bit = bin(calculate_crc(start_of_frame + can_id_bits + rtr_bit + ide_bit + control_r0_bit +
@@ -220,9 +233,12 @@ def convert_to_binary_string(can_id, dlc, data):
     # print(start_of_frame + can_id_bits + rtr_bit + ide_bit + control_r0_bit +  dlc_bits + data_bit_total + crc_bit+ crc_delimiter + ack_bit + ack_delimiter + end_of_frame_bits + inter_frame_spacing_bits )
     #stuffing the bits:
     stuffed_bits = stuff_bits(start_of_frame + can_id_bits + rtr_bit + ide_bit + control_r0_bit +  dlc_bits + data_bit_total + crc_bit)
+    # binary_string = start_of_frame + can_id_bits + rtr_bit + ide_bit + control_r0_bit +  dlc_bits + data_bit_total + crc_bit
     # Combining all bits as per CAN frame format and stuffing them
-    return  stuffed_bits + crc_delimiter + ack_bit + ack_delimiter + end_of_frame_bits + inter_frame_spacing_bits
- 
+    return  stuffed_bits + crc_delimiter + ack_bit + ack_delimiter + end_of_frame_bits + inter_frame_spacing_bits 
+    # return  binary_string + crc_delimiter + ack_bit + ack_delimiter + end_of_frame_bits + inter_frame_spacing_bits 
+
+# Not used
 def reverse_can_frame(binary_string):
     """
     Reverse the process of converting a CAN frame binary string back to its components.
@@ -233,35 +249,35 @@ def reverse_can_frame(binary_string):
     """
     # Unstuffing the bits
     binary_string = destuff_bits(binary_string)
- 
+
     # Extracting the relevant components from the binary string
- 
+
     # Start of Frame (SOF) bit
     start_of_frame = binary_string[0]
- 
+
     # Extracting the CAN ID (11 bits)
     can_id_bits = binary_string[1:12]
     can_id = bits_to_hex(can_id_bits)
- 
+
     # Remote Transmission Request (RTR) bit
     rtr_bit = binary_string[12]
- 
+
     # Identifier Extension (IDE) bit
     ide_bit = binary_string[13]
- 
+
     # Control bits (R0 and Stuff)
     control_r0_bit = binary_string[14]
- 
+
     # Data Length Code (DLC) (4 bits)
     dlc_bits = binary_string[15:19]
     dlc = int(dlc_bits, 2)
- 
+
     # Extracting the data bytes (data length specified by DLC)
     data_bits = binary_string[19:19 + dlc * 8]
     data = [hex(int(data_bits[i:i+8], 2))[2:].zfill(2) for i in range(0, len(data_bits), 8)]
- 
+
     return can_id, dlc, data
- 
+
 def bits_to_hex(binary_str):
     """
     Convert binary string to hexadecimal.
@@ -271,187 +287,187 @@ def bits_to_hex(binary_str):
         str: Hexadecimal string.
     """
     return hex(int(binary_str, 2))[2:].upper()
- 
+
 def data_to_be_utilized(file_path):
     # Reading the CSV file without headers
     columns = ['timestamp','can_id', 'dlc', 'data0', 'data1', 'data2', 'data3', 'data4',
            'data5', 'data6', 'data7', 'flag']
     df = pd.read_csv(file_path, names = columns,skiprows=1)
- 
+
     # df = pd.read_csv(file_path, header=None)
     # print(df)
- 
+
     # # Manually assigning names to the first two columns
     # df.columns = ['timestamp', 'can_id'] + list(df.columns[2:])
- 
+
     # Extracting the required columns
     selected_columns = df[['timestamp', 'can_id']]
- 
+
     # df['timestamp'] = pd.to_datetime(df['timestamp'])
     return selected_columns
- 
+
 # Function to extract distinct CAN IDs
 def extract_distinct_can_ids(selected_columns):
- 
+
     # Finding the distinct CAN IDs
     distinct_can_ids = selected_columns['can_id'].unique()
- 
+
     return distinct_can_ids
- 
+
 #Converting the timesttamp to decimal form
 def preprocess_time(df):
- 
+
     #Converting time values to decimal form
     df['timestamp'] = df['timestamp'].astype(float)
- 
+
     #Sorting the data based on can_id and timestamp
     df.sort_values(by=['can_id', 'timestamp'], inplace=True)
     return df
- 
- 
+
+
 def calculate_periodicity(df):
- 
+
     # Calculate the time difference between consecutive timestamps for each 'can_id'.
     # The `groupby` function groups the DataFrame by 'can_id'.
     # The `diff` function computes the difference between each timestamp and the previous one within each group.
     # The result is stored in a new column 'time_diff'.
     df['time_diff'] = df.groupby('can_id')['timestamp'].diff()
- 
+
     # Grouping the DataFrame by 'can_id' again to perform aggregation on the 'time_diff' column.
     # The `agg` function allows us to calculate multiple aggregate statistics at once:
     # - 'mean' computes the average interval for each 'can_id'.
     # - 'std' computes the standard deviation of the intervals for each 'can_id', indicating the variability.
     periodicity_stats = df.groupby('can_id')['time_diff'].agg(['mean', 'std']).reset_index()
- 
+
     # Calculating the total number of frames (occurrences) for each 'can_id'.
     frame_counts = df.groupby('can_id').size().reset_index(name='occurrences')
- 
+
     # Merge the periodicity statistics with the frame counts.
     periodicity = pd.merge(periodicity_stats, frame_counts, on='can_id')
- 
+
     # Renaming the columns of the resulting DataFrame for clarity:
     # - 'can_id' remains the identifier for each group.
     # - 'mean' is renamed to 'average_interval' to indicate it represents the average time interval.
     # - 'std' is renamed to 'std_deviation' to indicate it represents the standard deviation of the time intervals.
     periodicity.columns = ['can_id', 'average_interval (in ms)', 'std_deviation','no_of_occurences']
-   
+    
     # Convert the values of 'average_interval' to milliseconds by multiplying by 1000
     periodicity['average_interval (in ms)'] *= 1000
- 
+
     # Sort the DataFrame based on the 'average_interval' column in ascending order
     periodicity.sort_values(by='average_interval (in ms)', inplace=True)
- 
+
     return periodicity
- 
-def CH_form_data(input_filename):
+
+def form_data(input_filename):
     """
     Reading data from a file and formatting it into arrays for further processing.
- 
+
     Args:
         input_filename (str): Path to the input file containing CAN data.
- 
+
     Returns:
         tuple: A tuple containing three elements:
             - data_array (list): A list of lists containing timestamp and converted binary data.
             - frame_type (list): A list containing frame types (0 for benign frames, 1 for attacked frames).
             - anchor (list): A list containing unique converted binary data strings for a specific CAN arbitration ID.
             Anchor frames are derived from the CAN ID with the lowest periodicity, which corresponds to the highest frequency and highest priority (defined as the lowest CAN ID).
- 
+
     """
- 
+
     # Initialising empty lists and variables
- 
+
     #frame count
-    fc = 1
- 
+    # fc = 1
+
     # List to store timestamp and converted binary data
     data_array = []
- 
+
     # List to store frame types : attack/benign
     frame_type = []
- 
-    # Arbitration ID to identify anchor frames
-    can_arb_id = '0002'
- 
+
+    # # Arbitration ID to identify anchor frames
+    # can_arb_id = '0002'
+
     #binary string size of each data frame
-    frame_size = []
- 
+    # frame_size = []
+
     # Set to store unique converted binary data  strings for anchor frames
-    anchor = set()  
- 
+    # anchor = set()  
+
     # Open the input file for reading
     with open(input_filename, 'r') as input_file:
- 
+
         # Iterate over each line in the input file
         for line in input_file:
- 
+
             # # Splitting the line by comma to extract different parts
             parts = line.strip().split(',')
- 
+
             # Extract the timestamp, CAN ID, DLC, and data
             timestamp = float(parts[0])
             can_id = parts[1]
             dlc = int(parts[2])
             data = parts[3:3 + dlc]
- 
+
             # Determining frame type based on the last part (R for benign, otherwise T for attack)
             frame_type.append(0 if parts[-1] == 'R' else 1)
             converted_data = convert_to_binary_string(can_id, dlc, data)
             # print(converted_data)
             #storing binary string size of each data string
-            frame_size.append([fc,len(converted_data)])
-            fc+=1
- 
+            # frame_size.append([fc,len(converted_data)])
+            # fc+=1
+
             # Checking if the CAN ID matches the anchor CAN ID
-            if can_id == can_arb_id:
-                anchor.add(converted_data)
- 
+            # if can_id == can_arb_id:
+            #     anchor.add(converted_data)
+
             # Appending timestamp and converted binary data to the data array
             data_array.append([timestamp, converted_data])
- 
+
     # Converting set to list to ensure consistent ordering
-    anchor = list(anchor)
-    print("returning CH_form_data")
-    return data_array, frame_type, anchor, frame_size
- 
+    # anchor = list(anchor)
+    print("returning form_data")
+    return data_array, frame_type
+
 def OTIDS_form_data(input_filename):
     """
     Reading data from a file and formatting it into arrays for further processing.
- 
+
     Args:
         input_filename (str): Path to the input file containing CAN data.
- 
+
     Returns:
         tuple: A tuple containing three elements:
             - data_array (list): A list of lists containing timestamp and converted binary data.
             - frame_type (list): A list containing frame types (0 for benign frames, 1 for attacked frames).
             - anchor (list): A list containing unique converted binary data strings for a specific CAN arbitration ID.
- 
+
     """
- 
+
     # Initialising empty lists and variables
- 
+
     #frame count
     fc = 1
- 
+
     # List to store timestamp and converted binary data
     data_array = []
- 
+
     # List to store frame types : attack/benign
     frame_type = []
- 
+
     # Arbitration ID to identify anchor frames
     can_arb_id = '0153'
- 
+
     #binary string size of each data frame
     frame_size = []
- 
+
     # Set to store unique converted binary data  strings for anchor frames
     anchor = set()  
- 
+
     # Open the input file for reading
     with open(input_filename, 'r') as input_file:
- 
+
         # Iterate over each line in the input file
         for line in input_file:
             line = line.strip()
@@ -469,61 +485,62 @@ def OTIDS_form_data(input_filename):
             payload = data[1:9]
             # Determining frame type based on the last part (R for benign, otherwise T for attack)
             frame_type.append(0 if label== 'R' else 1)
- 
+
             # Converting data to binary string representation
             converted_data = convert_to_binary_string(can_id, dlc, payload)
             #storing binary string size of each data string
             frame_size.append([fc,len(converted_data)])
             fc+=1
- 
+
             # Checking if the CAN ID matches the anchor CAN ID
             if can_id == can_arb_id:
                 anchor.add(converted_data)
- 
+
             # Appending timestamp and converted binary data to the data array
             data_array.append([timestamp, converted_data])
- 
+
     # Converting set to list to ensure consistent ordering
     anchor = list(anchor)
- 
+
     return data_array, frame_type, anchor, frame_size
- 
+
 def MIRGU_form_data(input_filename):
     """
     Reading data from a file and formatting it into arrays for further processing.
- 
+
     Args:
         input_filename (str): Path to the input file containing CAN data.
- 
+
     Returns:
         tuple: A tuple containing three elements:
             - data_array (list): A list of lists containing timestamp and converted binary data.
             - frame_type (list): A list containing frame types (0 for benign frames, 1 for attacked frames).
             - anchor (list): A list containing unique converted binary data strings for a specific CAN arbitration ID.
- 
+
     """
+
     # Initialising empty lists and variables
     #frame count
     fc = 1
- 
+
     # List to store timestamp and converted binary data
     data_array = []
- 
+
     # List to store frame types : attack/benign
     frame_type = []
- 
+
     # Arbitration ID to identify anchor frames
-    can_arb_id = '0160'
- 
+    can_arb_id = '0130'
+
     #binary string size of each data frame
     frame_size = []
- 
+
     # Set to store unique converted binary data  strings for anchor frames
     anchor = set()  
- 
+
     # Open the input file for reading
     with open(input_filename, 'r') as input_file:
- 
+
         # Iterate over each line in the input file
         for line in input_file:
             parts = line.strip().split(',')            
@@ -531,64 +548,70 @@ def MIRGU_form_data(input_filename):
             timestamp = float(parts[0])
             can_id = parts[1]
             dlc = int(parts[2])
-            data = parts[3:3 + dlc]
- 
+            # data = parts[3:3 + dlc]
+            data = parts[-dlc-1:-1]
             # Determining frame type based on the last part (R for benign, otherwise T for attack)
             frame_type.append(0 if parts[-1] == 'R' else 1)
             converted_data = convert_to_binary_string(can_id, dlc, data)
+            data_bits= converted_data[19: 19+64]
+            print("TIMESTAMP : ", timestamp, "CAN ID : ", can_id)
+            print("data bits : ", data_bits)
+            print("DATA : ", data)
+            for i in range(0,len(data_bits),8):
+                print("data ",i, data_bits[i:i+8])
+            # print("Converted Data : ", converted_data)
             #storing binary string size of each data string
             frame_size.append([fc,len(converted_data)])
             fc+=1
- 
+
             # Checking if the CAN ID matches the anchor CAN ID
             if can_id == can_arb_id:
                 anchor.add(converted_data)
- 
+
             # Appending timestamp and converted binary data to the data array
             data_array.append([timestamp, converted_data])
- 
+
     # Converting set to list to ensure consistent ordering
     anchor = list(anchor)
- 
+
     return data_array, frame_type, anchor, frame_size
- 
+
 def CARLA_form_data(input_filename):
- 
+
     """
     Reading data from a file and formatting it into arrays for further processing.
- 
+
     Args:
         input_filename (str): Path to the input file containing CAN data.
- 
+
     Returns:
         tuple: A tuple containing three elements:
             - data_array (list): A list of lists containing timestamp and converted binary data.
             - frame_type (list): A list containing frame types (0 for benign frames, 1 for attacked frames).
             - anchor (list): A list containing unique converted binary data strings for a specific CAN arbitration ID.
- 
+
     """
- 
+
     # Initialising empty lists and variables
- 
-    #frame count
-    fc = 1
- 
+
+    # #frame count
+    # fc = 1
+
     # List to store timestamp and converted binary data
     data_array = []
- 
+
     # List to store frame types : attack/benign
     frame_type = []
- 
-    # Arbitration ID to identify anchor frames
-    can_arb_id = '0000014a'
- 
-    #binary string size of each data frame
-    frame_size = []
- 
-    # Set to store unique converted binary data  strings for anchor frames
-    anchor = set()  
 
- 
+    # # Arbitration ID to identify anchor frames
+    # can_arb_id = '017c'
+
+    # #binary string size of each data frame
+    # frame_size = []
+
+    # # Set to store unique converted binary data  strings for anchor frames
+    # anchor = set()  
+
     # Open the input file for reading
     with open(input_filename, 'r') as input_file:
 
@@ -605,25 +628,23 @@ def CARLA_form_data(input_filename):
             frame_type.append(0 if parts[-1] == 'R' else 1)
             converted_data = convert_to_binary_string(can_id, dlc, data)
             #storing binary string size of each data string
-            frame_size.append([fc,len(converted_data)])
-            fc+=1
+            # frame_size.append([fc,len(converted_data)])
+            # fc+=1
 
-            # Checking if the CAN ID matches the anchor CAN ID
-            if can_id == can_arb_id:
-                anchor.add(converted_data)
+            # # Checking if the CAN ID matches the anchor CAN ID
+            # if can_id == can_arb_id:
+            #     anchor.add(converted_data)
 
             # Appending timestamp and converted binary data to the data array
             data_array.append([timestamp, converted_data])
 
- 
-    # Converting set to list to ensure consistent ordering
-    anchor = list(anchor)
- 
-    return data_array, frame_type, anchor, frame_size
- 
- 
-   
-   
+    # # Converting set to list to ensure consistent ordering
+    # anchor = list(anchor)
+
+    # return data_array, frame_type, anchor, frame_size
+    return data_array, frame_type
+
+
  
 def convert_to_json(input_filename,json_filename):
     # input_filename = "/home/isha/Documents/Adv_Attacks_Defenses/test/Dataset/carla_test_data.log"
@@ -654,23 +675,17 @@ def convert_to_json(input_filename,json_filename):
     #split_csv(input_filename, "Dataset/DoS_dataset_S.csv", "Dataset/DoS_dataset_T.csv")
  
     # # Calling the form_data function to process the input file and obtain data arrays
-    if('MIRGU'.lower() in MODEL_NAME.lower()):
-        print("using mirgu function for making data frame")
-        data_array, frame_type, anchor, frame_size = MIRGU_form_data(input_filename)
-    if('CARLA'.lower() in MODEL_NAME.lower()):
-        print("Using carla function for making data frame")
-        data_array, frame_type, anchor, frame_size = CARLA_form_data(input_filename)
-    if('CarHacking'.lower() in MODEL_NAME.lower()):
-        print("using car hacking function for making data frame")
-        data_array, frame_type, anchor, frame_size = CH_form_data(input_filename)
-   
+    print("using form function for making data frame")
+    data_array, frame_type = form_data(input_filename)
+    
+    
     # Saving data to a JSON file
     # with open(r"Dos_attack.json", "w") as json_file:
     # with open(r"DoS_carla_test.json", "w") as json_file:
     
     with open(json_filename, "w") as json_file:
         # Write the data arrays and anchor list to the JSON file
-        json.dump({"data_array": data_array, "frame_type": frame_type, "anchor": anchor}, json_file)
+        json.dump({"data_array": data_array, "frame_type": frame_type}, json_file)
  
  
 # if __name__ == "__main__":

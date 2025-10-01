@@ -10,7 +10,6 @@ def train_model(modelName, modelPath, adv_attack):
     
     print("Starting Training")
     model.train()
-    print("Training Completed")
 
     model.save(modelPath)
     print(f"Model saved at {os.path.normpath(modelPath)}")

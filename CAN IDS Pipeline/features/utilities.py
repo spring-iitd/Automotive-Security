@@ -158,4 +158,3 @@ def sequencify(dataset, target, start, end, window):
 
 def df_to_csv(dataframe,output_file_path):
     dataframe.to_csv(output_file_path, index=False)
-

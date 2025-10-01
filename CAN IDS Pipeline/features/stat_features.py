@@ -5,7 +5,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import joblib
 
-def extract_features():
+def extract_features(file_path):
     print("Extracting features")
     dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
     modified_dataset_path = os.path.join(dataset_path,MODE)

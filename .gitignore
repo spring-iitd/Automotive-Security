@@ -15,16 +15,15 @@ Smart Attack Algorithm/Attack Comparison/*.csv
 Smart Attack Algorithm/Attack Comparison/*.pkl
 Smart Attack Algorithm/Attack Comparison/*.h5
 Smart Attack Algorithm/Attack Comparison/*.sav
-<<<<<<< HEAD
 
-CAN IDS Pipeline/datasets/*
-CAN IDS Pipeline/**/__pycache__/
-CAN IDS Pipeline/models/
-=======
-Statistical Techniques/**/*.csv
-Statistical Techniques/**/*.txt
->>>>>>> 5bc51af0a (added statistical techniques)
 CanBus-IDS-main/Data/
 CanBus-IDS-main/results/
 
+# Ignore pycache and models
+CAN IDS Pipeline/**/__pycache__/
+CAN IDS Pipeline/models/
 
+# Ignore specific datasets and results
+CAN IDS Pipeline/datasets/*
+Statistical Techniques/**/*.csv
+Statistical Techniques/**/*.txt

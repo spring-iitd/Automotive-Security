@@ -31,6 +31,4 @@ class StatisticalAttack(Attack):
     def apply(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """
         Perturb traffic-level statistical features.
-        E.g., inject noise into inter-arrival times, payload frequencies, etc.,
-        as seen in CANEDERLI’s `attacks.py`.
         """

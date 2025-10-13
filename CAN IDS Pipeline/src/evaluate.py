@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import os
 from config import *
 from datetime import datetime
-import time
 
 
 def evaluation_metrics(all_preds, all_labels):

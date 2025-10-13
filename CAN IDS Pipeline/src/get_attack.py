@@ -1,7 +1,6 @@
 import os
 import sys
 from config import *
-# from attacks import attack_handler
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import attacks.attack_handler as attack_handler
 

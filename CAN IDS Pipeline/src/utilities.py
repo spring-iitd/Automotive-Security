@@ -8,8 +8,6 @@ import matplotlib.pyplot as plt
 from torchvision.utils import save_image
 
 
-# import torch.nn as nn
-# import torch.nn.functional as F
 
 def hex_to_bits(hex_value, num_bits):
     """

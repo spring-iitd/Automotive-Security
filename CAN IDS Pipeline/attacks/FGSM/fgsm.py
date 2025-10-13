@@ -12,30 +12,13 @@ from .generate_mask import *
 from evaluate import *
 import pandas as pd
 from attack_config import *
-
+import json
 
     
 # Loads the pre-trained model and test model based on the specified types
 
-# def load_model(test_model_path, surr_model_path):
-#     print("Test model :", test_model_path)
-#     print("Surr model path :", surr_model_path)
-#     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-#     model = torch.load(surr_model_path, map_location=device)
-#     test_model = None
-#     if(test_model_path):
-#         test_model = torch.load(test_model_path, map_location=device)
-#         test_model.to(device)
-#         test_model.eval()
-
-#     model.eval()
-
-#     return model, test_model
 
 def load_model(test_model_path, surr_model_path):
-    # print("Test model :", test_model_path)
-    # print("Surr model path :", surr_model_path)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -52,10 +35,6 @@ def load_model(test_model_path, surr_model_path):
         test_model.eval()
 
     return model, test_model
-
-
-
-
 
 
 def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packet_level_data, image_no, flag):
@@ -501,7 +480,7 @@ def safe_to_csv(df, path, **kwargs):
     df.to_csv(path, **kwargs)
 
 def FGSM_attack(surr_model_path, test_model_path):
-
+    print("inside FGSM attack function")
     '''
     #steps to run:
     1. Select surr and target model type
@@ -519,19 +498,10 @@ def FGSM_attack(surr_model_path, test_model_path):
     #Define paths for dataset and model
     dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
     test_dataset_dir = os.path.join(dataset_path, "test", TEST_DATASET_DIR)
-    # print("TEST DATA IN BLACKBOX : ", test_dataset_dir)
-    # print(f"Test Dataset dir : {test_dataset_dir}")
     test_label_file = os.path.join(test_dataset_dir, "labels.txt")
-    # print("TEST LABEL FILE IN BLACKBOX : ", test_label_file)
-    
     
 
     #folder and filename to save results
-
-    # dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
-    # result_path = os.path.join(dataset_path, "Results","blackbox")
-    # os.makedirs(result_path, exist_ok=True)
-
     timestamp = datetime.now().strftime("_%Y_%m_%d_%H%M%S")
     output_path = os.path.join(dataset_path, "adversarial_images", f"{ADV_ATTACK}_{ADV_ATTACK_TYPE}_{timestamp}")
     os.makedirs(output_path, exist_ok=True)
@@ -541,14 +511,8 @@ def FGSM_attack(surr_model_path, test_model_path):
     # filename = f"blackbox_dos_{timestamp}.png"
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # csv_file_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME, "csv_files", FILE_NAME[:-4]+"_track.csv")
     csv_file_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME, "test", TEST_DATASET_DIR, "track.csv")
-
-    # csv_file_path= os.path.join(dataset_path, "csv_files", "Dos_car_hacking_wo_stuff.csv")
     packet_level_data = pd.read_csv(csv_file_path)
-
-
-    # packet_level_data = pd.read_csv("test.csv")
 
     # Clean up all column names: strip spaces, remove BOMs
     packet_level_data.columns = packet_level_data.columns.str.strip()
@@ -567,19 +531,10 @@ def FGSM_attack(surr_model_path, test_model_path):
     injection_type = "Gradient"  
     modification_type = "Gradient" 
     bit_pattern = "0"+ID+"000"+DLC
-    # bit_pattern = "0000000000000001000" # for matching the packets/rows to modify 
-    # existing_hex_ids = ['0130', '0002', '0131', '0140', '018f',
-    #                 '02c0', '0370', '0316', '0153', '043f', '0260',
-    #                 '02a0', '0350', '0440', '0329', '0545', '0430',
-    #                 '01f1', '04b1', '04f0', '05f0', '00a0', '00a1',
-    #                 '0690', '05a0', '05a2']
     
-    # existing_hex_ids = ['0000017c','000001a3','000001a4','00000309','00000326','00000374','0000037b','0000014a']
-    existing_hex_ids = ['01a3', '0374', '014a', '037b', '0309', '017c', '0326', '01a4']     # carla
-    
-    # existing_hex_ids = ['018f', '0260', '02a0', '0329', '0545', '0002', '0153', '02c0', '0130', '0131', 
-    # '0140', '0350', '043f', '0370', '0440', '0316', '04f0', '0430', '04b1', '01f1',
-    #  '05f0', '00a0', '00a1', '0690', '05a0', '05a2']            # car hacking
+    dci_file_path = csv_file_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME, "json_files", "distinct_can_ids.json")
+    with open(dci_file_path, "r") as f:
+        existing_hex_ids = json.load(f)
    # List of max_perturbations to iterate over
     max_perturbations_list = [MAX_INJECTION_LIMIT]
     # max_perturbations_list = [1, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60]
@@ -596,52 +551,8 @@ def FGSM_attack(surr_model_path, test_model_path):
         preds, labels, packet_level_data = Attack_procedure(model, test_model, device, test_loader, injection_type, modification_type, epsilon, max_injection_perturbations,output_path,bit_pattern,existing_hex_ids, start_image_number, packet_level_data)
         et = time.time()
         print("End time:", et)
-        # print("Labels:", labels)
-        # print("Predictions:", preds)
-        
-    #     tnr, mdr, oa_asr, IDS_accu, IDS_prec, IDS_recall,IDS_F1 = evaluation_metrics(preds, labels,folder,filename)
-    #     print("----------------IDS Perormance Metric----------------")
-    #     print(f'Accuracy: {IDS_accu:.4f}')
-    #     print(f'Precision: {IDS_prec:.4f}')
-    #     print(f'Recall: {IDS_recall:.4f}')
-    #     print(f'F1 Score: {IDS_F1:.4f}')
-
-    #     print("----------------Adversarial attack Perormance Metric----------------")
-    #     print("TNR:", tnr)
-    #     print("Malcious Detection Rate:", mdr)
-    #     print("Attack Success Rate:", oa_asr)
-    #     print("Execution Time:", et-st)
-
-    # print("--------------------------------")
-    # print(f"Testing with max_injections  {max_perturbations_list[0]} and Injection_type {injection_type}")
-    # print(f"Testing with max_modification depending on each image and Modification_type {modification_type}")
-
-    # Call the attack procedure 
-    # preds, labels, packet_level_data = Attack_procedure(model, test_model, device, test_loader, injection_type, modification_type, epsilon, max_perturbations_list[0],output_path,bit_pattern,existing_hex_ids, start_image_number, packet_level_data)
-    # et = time.time()
-    # print("End time:", et)
-    # print("Labels:", labels)
-    # print("Predictions:", preds)
+       
     
-    # tnr, mdr, oa_asr, IDS_accu, IDS_prec, IDS_recall,IDS_F1 = evaluation_metrics(preds, labels,folder,filename)
-    # print("----------------IDS Perormance Metric----------------")
-    # print(f'Accuracy: {IDS_accu:.4f}')
-    # print(f'Precision: {IDS_prec:.4f}')
-    # print(f'Recall: {IDS_recall:.4f}')
-    # print(f'F1 Score: {IDS_F1:.4f}')
-
-    # print("----------------Adversarial attack Perormance Metric----------------")
-    # print("TNR:", tnr)
-    # print("Malcious Detection Rate:", mdr)
-    # print("Attack Success Rate:", oa_asr)
-    # print("Execution Time:", et-st)
-
-    # output_csv_file = "./blackbox_ch_final_rgb_random/packet_level_data.csv"
-    # os.makedirs(output_csv_file, exist_ok=True)
-
-    # packet_level_data.to_csv(output_csv_file, index=False)
-
-    # safe_to_csv(packet_level_data, "./blackbox_ch_final_rgb_random/packet_level_data.csv", index=False)
     packet_csv_file_dir = os.path.join(dataset_path,"csv_files", FILE_NAME[:-4] + "_blackbox_final_rgb_random")
     packet_csv_file = os.path.join(packet_csv_file_dir, "packet_level_data.csv")
     os.makedirs(packet_csv_file_dir, exist_ok=True)
@@ -649,5 +560,7 @@ def FGSM_attack(surr_model_path, test_model_path):
 
     # added 
     return preds, labels
+
+
 
 

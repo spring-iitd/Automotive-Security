@@ -6,22 +6,14 @@ from torch.utils.data import DataLoader, TensorDataset
 from torchvision import datasets, transforms, models
 import numpy as np
 import os
-# import seaborn as sns
 from PIL import Image
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, accuracy_score
 from config import *
-
 import sys
-import os 
-
-from features.image import extract_feature_images
 from ids.base import IDS
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'features')))
-from features import feature_extractor
-from features.image import *
 from config import *
 from datetime import datetime 
 
@@ -35,7 +27,7 @@ class ResNet(IDS):
  
 
     def train(self, X_train=None, Y_train=None, **kwargs):
-        # super().train(X_train, Y_train)
+        
 
         # Load the test and train datasets from multiple folders
         dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
@@ -53,33 +45,24 @@ class ResNet(IDS):
  
     def test(self, X_test=None, Y_test=None, **kwargs):
         print("Entered model's testing method")
-        # super().train(X_test, Y_test)
+        
 
         dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
         test_dataset_dir = os.path.join(dataset_path, "test", TEST_DATASET_DIR)
-        # print(f"Test Dataset dir : {test_dataset_dir}")
+        
         test_label_file = os.path.join(test_dataset_dir, "labels.txt")
-        # print(f"Test label file : {test_label_file}")
+        
         test_loader = self.load_dataset(test_dataset_dir, test_label_file,is_train=False)
         print("Loaded test dataset")
 
         all_preds, all_labels = self.test_wisa(self.model, self.device, test_loader, self.criterion)
-        # tnr, mdr, oa_asr, IDS_accu, IDS_prec, IDS_recall,IDS_F1 = self.evaluation_metrics(all_preds, all_labels)
+
         evaluation_metrics(all_preds, all_labels)
 
-        # print("----------------IDS Perormance Metric----------------")
-        # print(f'Accuracy: {IDS_accu:.4f}')
-        # print(f'Precision: {IDS_prec:.4f}')
-        # print(f'Recall: {IDS_recall:.4f}')
-        # print(f'F1 Score: {IDS_F1:.4f}')    
-    
-
-    # def save(self, path):
-    #     torch.save(self.model.state_dict(), path)
-    #     "Model saved"
     def save(self, path):
-        torch.save(self.model, path)
-        "Model saved"
+        scripted_model = torch.jit.script(self.model)
+        scripted_model.save(path)
+        print("Model saved.")
  
 
     def predict(self, X_test):
@@ -87,15 +70,9 @@ class ResNet(IDS):
 
 
     def load(self, path):
-        # self.model.load_state_dict(torch.load(path,map_location=torch.device('cpu'), weights_only='True'))
-        # state_dict = torch.load(path, map_location=self.device, weights_only=True)
-        # self.model.load_state_dict(state_dict)
-        self.model = torch.load(path)
+        self.model = torch.jit.load(path)
         self.model.to(self.device)
 
-    # def extract_features(self,X=None,Y=None):
-    #     # extract_feature_images.image_as_feature()
-    #     feature_extractor.extract_features()
     
     def evaluation_metrics(self, all_preds, all_labels):
  
@@ -113,9 +90,7 @@ class ResNet(IDS):
         os.makedirs(result_path, exist_ok=True)
 
         plt.title('Confusion Matrix')
-        # plt.savefig('./CF_Images_Inject20_modifygrad_d161', dpi=300)
         plt.savefig(image, dpi=300)
-        #plt.show()
     
         # Now you can access the true negatives and other metrics
         true_negatives = cm[0, 0]
@@ -131,10 +106,8 @@ class ResNet(IDS):
         IDS_recall = recall_score (all_labels,all_preds)
         IDS_F1 = f1_score(all_labels,all_preds)
 
-        # Number of attack packets misclassified as benign (all_labels == 0 and all_preds == 1)
         misclassified_attack_packets = ((all_labels == 1) & (all_preds == 0)).sum().item()
     
-        # Total number of original attack packets (all_labels == 0)
         total_attack_packets = (all_labels == 1).sum().item()
     
         oa_asr = misclassified_attack_packets / total_attack_packets
@@ -153,7 +126,7 @@ class ResNet(IDS):
     def load_dataset(self, data_dir, label_file, is_train):
         """Load datasets and create DataLoader."""
         image_labels = self.load_labels(label_file)
-        print("Length Image labels : ", len(image_labels))
+        
         images = []
         labels = []
     
@@ -204,12 +177,10 @@ class ResNet(IDS):
                         f"Loss: {loss.item():.6f} Accuracy: {accuracy:.2f}%")
     
         print("Training complete!")
-        # torch.save(model.state_dict(), model_path)
+        
     
         # Print overall training loss and accuracy for the epoch
         overall_accuracy = 100. * correct / len(train_loader.dataset)
-        # print(f"Epoch {epoch} Summary: Average Loss: {running_loss / len(train_loader):.6f}, "
-        #     f"Accuracy: {overall_accuracy:.2f /epochs }%")
         
     
         return model
@@ -376,3 +347,4 @@ class InceptionResNetV1(nn.Module):
         x = self.dropout(x)
         x = self.fc(x)
         return F.log_softmax(x, dim = 1)
+ 

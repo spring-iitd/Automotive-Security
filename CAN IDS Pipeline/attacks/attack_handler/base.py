@@ -17,7 +17,6 @@ class Attack(abc.ABC):
         """
         pass
 
-    # ... (include set_params, is_estimator_valid, etc.)
 
 class EvasionAttack(Attack):
     @abc.abstractmethod

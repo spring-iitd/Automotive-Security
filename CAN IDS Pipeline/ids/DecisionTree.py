@@ -22,25 +22,8 @@ class DecisionTree(IDS):
         joblib.dump(self.dt, path)
     
     def predict(self, X_test):
-        # super().predict(X_test)
         dt_preds = self.dt.predict(X_test)
         return dt_preds
 
     def load(self, path):
         self.dt = joblib.load(path)
-
-    def extract_features(self):
-        return feature_extractor.extract_features()
-
-        # dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
-
-        # dataframe = stat_features.extract_features(dataset_path)
-        # X, Y = dataframe.drop(columns = ['flag', 'timestamp']).values, dataframe['flag'].values
-
-        # scaler = StandardScaler()
-        # scaler.fit(X)
-
-        # # Transform train and test sets
-        # X = scaler.transform(X)
-
-        # return X, Y

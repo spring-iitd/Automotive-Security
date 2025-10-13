@@ -1,1 +1,1 @@
-Make a README.md for this project which shows the usage of the pipeline created to run CAN bus IDS.
+A Toolkit for developing and evading Controller Area Network (CAN) Bus Network Intrusion Detection System (NIDS)

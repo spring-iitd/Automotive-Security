@@ -68,17 +68,6 @@ def shift_columns(df):
     print(df)
     return df
 
-def pre_process_attack_data(data_path,output_path):
-    
-    columns = ['timestamp','can_id', 'dlc', 'data0', 'data1', 'data2', 'data3', 'data4', 
-           'data5', 'data6', 'data7', 'flag']
-    
-    data = pd.read_csv(data_path, names=columns, header=None)
-    # print("before shifting",data)
-    data = data.replace(np.NaN, '00')
-    data = shift_columns(data)
-    data = data.replace(np.NaN, '00')
-    data.to_csv(output_path, index=False,header=False)
 
 def convert_to_binary_string(can_id, dlc, data):
     """
@@ -147,14 +136,10 @@ def convert_to_binary_string(can_id, dlc, data):
  
     # Inter-Frame Spacing bits
     inter_frame_spacing_bits = '1' * 3
-    # print("before stuffing")
-    # print(start_of_frame + can_id_bits + rtr_bit + ide_bit + control_r0_bit +  dlc_bits + data_bit_total + crc_bit+ crc_delimiter + ack_bit + ack_delimiter + end_of_frame_bits + inter_frame_spacing_bits )
-    #stuffing the bits:
+   #stuffing the bits:
     stuffed_bits = stuff_bits(start_of_frame + can_id_bits + rtr_bit + ide_bit + control_r0_bit +  dlc_bits + data_bit_total + crc_bit)
-    # binary_string = start_of_frame + can_id_bits + rtr_bit + ide_bit + control_r0_bit +  dlc_bits + data_bit_total + crc_bit
     # Combining all bits as per CAN frame format and stuffing them
     return  stuffed_bits + crc_delimiter + ack_bit + ack_delimiter + end_of_frame_bits + inter_frame_spacing_bits 
-    # return  binary_string + crc_delimiter + ack_bit + ack_delimiter + end_of_frame_bits + inter_frame_spacing_bits 
 
 def bits_to_hex(binary_str):
     """
@@ -172,16 +157,9 @@ def data_to_be_utilized(file_path):
            'data5', 'data6', 'data7', 'flag']
     df = pd.read_csv(file_path, names = columns,skiprows=1)
 
-    # df = pd.read_csv(file_path, header=None)
-    # print(df)
-
-    # # Manually assigning names to the first two columns
-    # df.columns = ['timestamp', 'can_id'] + list(df.columns[2:])
-
     # Extracting the required columns
     selected_columns = df[['timestamp', 'can_id']]
 
-    # df['timestamp'] = pd.to_datetime(df['timestamp'])
     return selected_columns
 
 # Function to extract distinct CAN IDs
@@ -305,7 +283,6 @@ def convert_to_json(input_filename,json_filename):
     periodicity = calculate_periodicity(preprocessed_time)
  
     # # Calling the form_data function to process the input file and obtain data arrays
-    print("using form function for making data frame")
     data_array, frame_type = form_data(input_filename)
 
     

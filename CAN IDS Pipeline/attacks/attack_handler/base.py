@@ -11,23 +11,18 @@ class Attack(abc.ABC):
 
     @abc.abstractmethod
     def apply(self, **kwargs):
-        """
-        Core attack logic. The meaning of parameters is up to subclass: 
-        could be frames, dataframes, model, training data, etc.
-        """
+        """Apply the attack to the given data."""
         pass
 
 
 class EvasionAttack(Attack):
     @abc.abstractmethod
     def apply(self, frames: list[dict], labels: np.ndarray | None = None, **kwargs) -> list[dict]:
-        """
-        Perturb actual CAN frames or features to cause model misclassification.
-        """
+        """Apply evasion attack to the given frames."""
+        pass
 
 class StatisticalAttack(Attack):
     @abc.abstractmethod
     def apply(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
-        """
-        Perturb traffic-level statistical features.
-        """
+        """Apply statistical attack to the given DataFrame."""
+        pass

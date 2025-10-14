@@ -15,27 +15,24 @@ def evaluation_metrics(all_preds, all_labels):
 
     # Generate confusion matrix
     # Print debug information
-    print("Inside evaluation matrix")
     dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
     if(ADV_ATTACK):
         result_path = os.path.join(dataset_path, "Results",ADV_ATTACK, ADV_ATTACK_TYPE)
         os.makedirs(result_path, exist_ok=True)
-        print("REsult :", result_path)
     else:
         result_path = os.path.join(dataset_path, "Results",MODEL_NAME)
         os.makedirs(result_path, exist_ok=True)
 
     timestamp = datetime.now().strftime("_%Y_%m_%d_%H%M%S")
-    # output_path = os.path.join(dataset_path, f"blackbox_dos_{timestamp}")
     folder = result_path
 
     if(ADV_ATTACK):
         filename = f"{ADV_ATTACK_TYPE}_dos_{timestamp}.png"
     filename = f"{MODEL_NAME}_{timestamp}.png"
 
-    print("Number of predictions:", len(all_preds))
-    print("Unique predictions:", np.unique(all_preds, return_counts=True))
-    print("Unique labels:", np.unique(all_labels, return_counts=True))
+    # print("Number of predictions:", len(all_preds))
+    # print("Unique predictions:", np.unique(all_preds, return_counts=True))
+    # print("Unique labels:", np.unique(all_labels, return_counts=True))
     
     cm = confusion_matrix(all_labels, all_preds, labels=[0, 1])
     print("Confusion Matrix:\n", cm)
@@ -46,14 +43,8 @@ def evaluation_metrics(all_preds, all_labels):
     plt.title('Confusion Matrix')
    
     os.makedirs(folder, exist_ok=True)
-    # Construct the full file path. For example, if folder='./CF_Results/DoS/old'
-    # and filename='TST.png', then output_path becomes './CF_Results/DoS/old/TST.png'.
     output_path = os.path.join(folder, filename)
     plt.savefig(output_path, dpi=300)
-    # plt.show()
-
-    # plt.savefig('./CF_Results/DoS/old/TST.png', dpi=300)
-    # plt.show()
     
     # Now you can access the true negatives and other metrics
     true_negatives = cm[0, 0]
@@ -92,4 +83,3 @@ def evaluation_metrics(all_preds, all_labels):
         
 
 
-    # return tnr, mdr, oa_asr, IDS_accu, IDS_prec, IDS_recall, IDS_F1

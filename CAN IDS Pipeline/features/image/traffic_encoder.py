@@ -184,18 +184,11 @@ def calculate_rows_to_skip(last_data_length, time_difference):
     else:
         green_part_time = time_difference - last_data_time
     green_part = ceil(green_part_time/0.000002)
-    # green_part = ceil(time_difference/0.000002)
-    # print("Green part : ", green_part)
-    # print("Last data length : ", last_data_length)
     total = green_part + last_data_length
-    # print("Total : ", total)
     row = ceil(total/ 128)        # 1 row = 256 microseconds (128 pixels)
 
     # add red part to the remainder 
     red_start = total %128 
-    # print("Red start : ", red_start)
-
-    # print("Returning row : ", row)
     return row, red_start
 
 def make_image_array(data_array, frame_type, data_rate, track_csv):
@@ -248,12 +241,8 @@ def make_image_array(data_array, frame_type, data_rate, track_csv):
             else:
                 valid_flag = 0
                 valid_image = 0
-            # print("TIME DIFF : ", time_diff)
-            # print("Current data length : ", data_length)
-            # print("Time for data : ", data_time)
             rows_to_skip, red_start = calculate_rows_to_skip(last_data_length, time_diff)
             new_row = curr_row + rows_to_skip
-            # print("NEW ROW: ", new_row)
             partial_row = new_row -1
             last_data_length = data_length
 
@@ -263,14 +252,6 @@ def make_image_array(data_array, frame_type, data_rate, track_csv):
             if(new_row >= 128):
                 # Appending matrix to binary_matrix as an image has been generated
                 binary_matrix.append(image)
-                # print("Appending image to binary matrix")
-                # j = 0
-                # for row in image: 
-                #     print(f"3's in {j} row {row.count('3')}")
-                #     print(row)
-                #     j+=1
-
-                # labels.append(1 if flag >= (1) else 0)
                 
                 labels.append(1 if flag >= (1) else 0)
                 if(valid_image):
@@ -291,22 +272,15 @@ def make_image_array(data_array, frame_type, data_rate, track_csv):
                 image = [['2' for _ in range(128)] for _ in range(128)]
                 image[new_row][:data_length] = list(bin_str)
                 image_counter +=1
-                # store[i] = (timestamp, image_counter)
-
-                # print("IMAGE's new row : ", image[new_row])
-                # print("Length ",len(image[new_row]))
                 curr_row = new_row
 
-                # print("Inside another image and inserted at index 0")
 
             # Frame is inserted in the current image
             else:    
-                # print("data length: ", data_length)
                 image[new_row][:data_length] = list(bin_str)
                 if(red_start != 0):
                     image[partial_row][red_start:] = ['3'] * (128 - red_start)
-                    # print("Adding red part at : ", partial_row, "Iteration : ",i)
-                # print("IMAGE's new row : ", image[partial_row])
+                    
 
                 curr_row = new_row
             

@@ -11,8 +11,6 @@ class PixNet(FeatureExtractor):
         self.extractor(self.file_path, self.json_file_path)
 
     def extractor(self, file_path, json_file_path):
-        print("file_path : ", file_path)
-        print("JSON FIle path : ", json_file_path)
         print("Converting to json")
         convert_to_json(file_path,json_file_path)
         print("Generating images")

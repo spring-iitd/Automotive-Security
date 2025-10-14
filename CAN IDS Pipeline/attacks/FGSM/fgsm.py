@@ -505,10 +505,8 @@ def FGSM_attack(surr_model_path, test_model_path):
     timestamp = datetime.now().strftime("_%Y_%m_%d_%H%M%S")
     output_path = os.path.join(dataset_path, "adversarial_images", f"{ADV_ATTACK}_{ADV_ATTACK_TYPE}_{timestamp}")
     os.makedirs(output_path, exist_ok=True)
-    # folder = result_path
 
     
-    # filename = f"blackbox_dos_{timestamp}.png"
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     csv_file_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME, "test", TEST_DATASET_DIR, "track.csv")
@@ -537,7 +535,6 @@ def FGSM_attack(surr_model_path, test_model_path):
         existing_hex_ids = json.load(f)
    # List of max_perturbations to iterate over
     max_perturbations_list = [MAX_INJECTION_LIMIT]
-    # max_perturbations_list = [1, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60]
     st = time.time()
     print("Start time:", st)
     # Loop through the list of max_perturbations
@@ -558,7 +555,6 @@ def FGSM_attack(surr_model_path, test_model_path):
     os.makedirs(packet_csv_file_dir, exist_ok=True)
     safe_to_csv(packet_level_data, packet_csv_file, index=False)
 
-    # added 
     return preds, labels
 
 

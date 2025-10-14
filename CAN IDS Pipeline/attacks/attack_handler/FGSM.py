@@ -30,7 +30,6 @@ class FGSM(Attack):
         csv_file = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME, "modified_dataset", new_file )
         with open(log_file, "w") as f:
             with redirect_stdout(f), redirect_stderr(f):
-                print("Making call to the attack : ", attack_name)
                 preds,labels  = FGSM_attack(surrogate_model_path, target_model_path)
                 
                 return evaluation_metrics(preds, labels)

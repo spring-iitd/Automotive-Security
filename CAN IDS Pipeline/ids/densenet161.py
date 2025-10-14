@@ -94,8 +94,6 @@ class Densenet161(IDS):
 
         plt.title('Confusion Matrix')
         plt.savefig(image, dpi=300)
-        #plt.show()
-    
     
         # Now you can access the true negatives and other metrics
         true_negatives = cm[0, 0]
@@ -110,7 +108,6 @@ class Densenet161(IDS):
     
         return IDS_accu, IDS_prec, IDS_recall, IDS_F1
     
-
 
     def load_labels(self, label_file):
         """Load image labels from the label file."""

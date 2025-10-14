@@ -13,9 +13,7 @@ class FGSM(Attack):
     
     def apply(self):
         attack_name = ADV_ATTACK.lower()
-        print(f"Selected adversarial attack: {attack_name}")
-
-
+        
         surrogate_model = os.path.join(DIR_PATH, "..", "models", SURROGATE_MODEL)
         target_model = os.path.join(DIR_PATH, "..", "models", TARGET_MODEL)
         surrogate_model_path = surrogate_model if SURROGATE_MODEL else None

@@ -44,13 +44,9 @@ def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packe
     # Precompute existing IDs as integers
     existing_int_ids = [int(h, 16) for h in existing_hex_ids]
 
-    # print(image.shape, mask.shape, perturbed_image.shape)
-
     for b in range(image.shape[0]):
         rows = mask[b, 0].nonzero(as_tuple=True)[0]
         rows = torch.unique(rows)
-
-        # print(rows, flag)
 
         injection_row = rows.item()
         i = injection_row - 1
@@ -61,16 +57,13 @@ def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packe
             first_pixel = image[b, 0, i, 0].item()  # First pixel in row i, channel 0
             second_pixel = image[b, 1, i, 0].item()  # Second pixel in row i, channel 1
             third_pixel = image[b, 2, i, 0].item()  # Third pixel in row i, channel 2
-            # print(first_pixel, second_pixel, third_pixel)
+            
             if first_pixel == 0.0 and second_pixel == 0.0 and third_pixel == 0.0:
                 packets_before_injection.append(i)
             i -= 1
 
         image_packets = packet_level_data[packet_level_data["image_no"] == image_no]
-        # print("Image packets before injection:\n", image_packets)
         target_index = len(packets_before_injection) - 1
-
-        # print("Target index for injection:", target_index, flag, injection_row)
 
         if flag == 'injection':
             start_row = packets_before_injection[0]
@@ -85,9 +78,6 @@ def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packe
                 )
                 red_pixel_count += red_pixels_mask.sum().item()
 
-            # print(f"Red pixel count between rows {start_row} and {end_row}: {red_pixel_count}")
-
-            # print("Target index for injection:", target_index)
             timestamp = image_packets.iloc[target_index]["timestamp"]
             new_timestamp = timestamp + (injection_row-packets_before_injection[0])*128*0.000002 - red_pixel_count*0.000002
         
@@ -110,7 +100,6 @@ def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packe
             
             new_id = format(best_int, 'X')
         
-            # print(packet_level_data.to_string())
 
             if flag == 'injection':
                 start_index = packet_level_data.index[packet_level_data["image_no"] == image_no][0]
@@ -118,7 +107,6 @@ def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packe
                 df_part_2 = packet_level_data.iloc[start_index+target_index+1:]
                 packet_level_data = pd.concat([df_part_1, pd.DataFrame({"timestamp": [new_timestamp], "can_id": [new_id], "image_no": [image_no], "row_no": [injection_row],"valid_flag": [1], "label": [1], "perturbation_type": "I"}), df_part_2], ignore_index=True)
             elif flag == 'modification':   
-                # print(packet_level_data[packet_level_data["image_no"] == image_no]) 
                 start_index = packet_level_data.index[packet_level_data["image_no"] == image_no][0]
                 packet_level_data.loc[start_index + target_index+1, ["can_id", "perturbation_type"]] = [new_id, "M"]
 
@@ -131,20 +119,17 @@ def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packe
                 val = 1.0 if bit == '1' else 0.0
                 perturbed_image[b, :, row, idx] = val
 
-            # print("Before Perturbed Row",perturbed_image[b, :, row, :])
             if flag == 'modification':
                 mid_bits = ''
                 # 7 represents middle bits (RTR + IDE + Reserved bit + DLC)
                 for col in range(1 + ID_len, 1 + ID_len + 7):
-                    # print("Columns:", col)
+                    
                     pix = perturbed_image[b, :, row, col]
-                    # print("Pixel:", pix)
+                    
                     bit = int((pix > 0.0).any().item())
                     mid_bits += str(bit)
 
-            # print("Middle Bits: ", mid_bits)
 
-            # print("Middle Perturbed Row",perturbed_image[b, :, row, 12:19])
             # --- 4. Decode data bits (unchanged) ---
             data_bits = ''
             start = 1 + ID_len + len(mid_bits)
@@ -178,7 +163,7 @@ def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packe
                 perturbed_image[b, 0, row, i] = 0.0
                 perturbed_image[b, 2, row, i] = 0.0
 
-            # print("Final Perturbed Row",perturbed_image[b, :, row, :])
+            
 
     return perturbed_image, packet_level_data
 
@@ -187,29 +172,20 @@ def perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packe
 def fgsm_attack_injection(image, data_grad,ep,perturbation_type, existing_hex_ids, packet_level_data, image_no):
     # Collect the element-wise sign of the data gradient
     sign_data_grad = data_grad.sign()
-    # print("print sign gradient here!!")
-    # save_image(sign_data_grad, f'test_sign_grad.png')
     print_image(sign_data_grad,0,1)
 
     if perturbation_type == "Random":
         mask = generate_multiple_mask_random(image, pack=1) 
     else:
         mask = generate_max_grad_mask(image, data_grad)
-    # print(mask.to_string())
+    
 
     if mask == None:
-        # print("No more green rows to inject")
         return image, packet_level_data
-    
-    # print("FGSM")
-    # print("Image", image)
-    # print("Sign", sign_data_grad)
-    # print("EP",ep)
-    # print("Mask",mask)
+  
 
     perturbed_image = image + ep * sign_data_grad*mask
     print_image(perturbed_image,0,1)
-    # print("Perturb", perturbed_image)
  
     perturbed_image, packet_level_data = perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packet_level_data, image_no,'injection')
     return perturbed_image, packet_level_data
@@ -234,10 +210,10 @@ def apply_injection(test_model,target,data_grad,data_denorm,ep,perturbation_type
    
     #for 0-benign, 1-attack
     if final_pred.item() == target.item():
-        # print("Perturbation {} not successful. Injecting more perturbation.".format(pack))
+        
         return True, final_pred, perturbed_data, packet_level_data, feedback  # Indicate that we need to reapply
     else:
-        # print("Perturbation {} successful. No more injection needed, return pack as final perturbation".format(pack))
+        
         return False, final_pred, perturbed_data, packet_level_data, feedback  # Indicate that we can stop
 
 def fixed_id_data_perturbation(image, perturbed_image,mask,ID,Data):
@@ -288,24 +264,16 @@ def fgsm_attack_modification(image,data_grad, epsilon,perturbation_type ,ID,Data
     # Collect the element-wise sign of the data gradient    
     sign_data_grad = data_grad.sign()
 
-    # print("Matched rows for modification:", matched_rows)
-    # print("Selected rows set for modification:", selected_rows_set)
-
     mask,matched_rows,selected_rows_set = generate_mask_modify(image, data_grad,matched_rows,selected_rows_set,bit_pattern, perturbation_type)
-    # sign_data_grad = sign_data_grad * mask
-    # print("Matched rows after modification:", matched_rows)
-    # print("Selected rows set after modification:", selected_rows_set)
-    # torch.set_printoptions(threshold=torch.inf, linewidth=200)  # Show all values in one row
-    # print("Image:", image)
+   
     perturbed_image = image + epsilon * sign_data_grad * mask
-    # print("Perturbed Image:", perturbed_image)
+    
 
     if perturbation_type == "Gradient":
         perturbed_image, packet_level_data = perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packet_level_data, n_image, 'modification')
     elif perturbation_type == "Random":
         perturbed_image, packet_level_data = perturbation_constraints(image, perturbed_image,mask,existing_hex_ids, packet_level_data, n_image, 'modification')
-    # elif perturbation_type == "Targetted":
-    #     perturbed_image = fixed_id_data_perturbation(image, perturbed_image,mask,ID,Data)
+    
     
     # Return the perturbed image
      # Adding clipping to maintain [0,1] range
@@ -317,8 +285,6 @@ def apply_modification(test_model,target,data_grad,data_denorm,ep,perturbation_t
     
     
     perturbed_data,matched_rows,selected_rows_set,packet_level_data = fgsm_attack_modification(data_denorm,data_grad, ep,perturbation_type ,ID,Data, matched_rows,selected_rows_set,bit_pattern,existing_hex_ids, packet_level_data, n_image)
-    # print_image(perturbed_data,2,pack)
-    # save_image(perturbed_data, f'./test_mod_data.png')
     
     with torch.no_grad():
         output = test_model(perturbed_data)
@@ -326,18 +292,14 @@ def apply_modification(test_model,target,data_grad,data_denorm,ep,perturbation_t
 
 
     pred_probs = torch.softmax(output, dim=1)
-    # print("Modification : Probability of prediction",pred_probs)
     # Get the predicted class index
     final_pred = output.max(1, keepdim=True)[1] # index of the maximum log-probability
-    # print("predicted, label ",final_pred.item(), target.item())
 
     
     #for 0-benign, 1-attack
     if final_pred.item() == target.item():
-        # print("Perturbation {} not successful. Injecting more perturbation.".format(pack))
         return True, final_pred, perturbed_data,matched_rows,selected_rows_set, packet_level_data, feedback  # Indicate that we need to reapply
     else:
-        # print("Perturbation {} successful. No more injection needed, return pack as final perturbation".format(pack))
         return False, final_pred, perturbed_data,matched_rows,selected_rows_set,packet_level_data, feedback  # Indicate that we can stop
     
 
@@ -363,11 +325,8 @@ def Attack_procedure(model, test_model, device, test_loader, injection_type, mod
         model = test_model
 
     for data, target in test_loader:
-        # print(f"Current target shape: {target.shape}, value: {target}")
         data, target = data.to(device), target.to(device)
         
-        # If target is a 1D tensor, no need for item()
-        # current_target = target[0] if target.dim() > 0 else target
         feedback = 0
 
         # Initialize predictions for benign images (target=0)
@@ -409,7 +368,7 @@ def Attack_procedure(model, test_model, device, test_loader, injection_type, mod
                     continue_perturbation, final_pred, data_denorm, packet_level_data, feedback = apply_injection(
                         test_model, target, data_grad, perturbed_data, ep,injection_type,existing_hex_ids, packet_level_data, n_image, feedback
                     )
-                    # save_image(data_denorm, f'./test_inj_data_{n_image}.png')
+                    
                     injection_count += 1
                     if continue_perturbation and modification_count < max_modification_perturbations:
                         perturbation_type = "modification"  # Switch to modification on failure
@@ -418,7 +377,7 @@ def Attack_procedure(model, test_model, device, test_loader, injection_type, mod
                     continue_perturbation, final_pred, data_denorm,matched_rows,selected_rows_set, packet_level_data, feedback = apply_modification(
                         test_model, target, data_grad, perturbed_data, ep,modification_type,target_ID,target_Data,matched_rows,selected_rows_set,bit_pattern,existing_hex_ids, packet_level_data, n_image, feedback
                     )
-                    # save_image(data_denorm, f'./test_mod_data_{n_image}.png')
+                    
                     modification_count += 1
                     if continue_perturbation and injection_count < max_injection_perturbations:
                         perturbation_type = "injection"  # Switch to injection on failure
@@ -431,7 +390,7 @@ def Attack_procedure(model, test_model, device, test_loader, injection_type, mod
                     elif modification_count < max_modification_perturbations:
                         perturbation_type = "modification"
 
-                # print(f"Injection count: {injection_count}, Modification count: {modification_count}")
+               
 
             saving_image(data_denorm, n_image,output_path)
         else:
@@ -446,8 +405,6 @@ def Attack_procedure(model, test_model, device, test_loader, injection_type, mod
         print(f"Final perturbations: Injection={injection_count}, Modification={modification_count}")
         print(f"Image {n_image}, Truth Labels {target.item()}, Final Pred {final_pred.cpu().numpy()}")
 
-        # all_preds.extend(final_pred.cpu().numpy())
-        # all_labels.extend(target.cpu().numpy())
         all_preds.append(final_pred.item())
         all_labels.append(target.item())
 
@@ -519,7 +476,7 @@ def FGSM_attack(surr_model_path, test_model_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     image_datasets, test_loader, start_image_number = load_dataset(test_dataset_dir,test_label_file,device,is_train=False)
-    print("loaded test dataset")
+    # print("loaded test dataset")
     
     #laod the model
     model, test_model = load_model(test_model_type ,surr_model_type)

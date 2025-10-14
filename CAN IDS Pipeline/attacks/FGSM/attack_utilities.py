@@ -83,7 +83,7 @@ def print_image(img,n,pack):
     img = np.clip(img, 0, 1)  # Just in case
 
     plt.imshow(img, interpolation='none')  
-    # plt.imshow(img, cmap='gray', interpolation='none')
+    
     if n == 1:
         plt.title(f"Mask, Injection {pack})")
     elif n == 2:

@@ -14,7 +14,6 @@ def evaluation_metrics(all_preds, all_labels):
         return
 
     # Generate confusion matrix
-    # Print debug information
     dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
     if(ADV_ATTACK):
         result_path = os.path.join(dataset_path, "Results",ADV_ATTACK, ADV_ATTACK_TYPE)
@@ -29,10 +28,6 @@ def evaluation_metrics(all_preds, all_labels):
     if(ADV_ATTACK):
         filename = f"{ADV_ATTACK_TYPE}_dos_{timestamp}.png"
     filename = f"{MODEL_NAME}_{timestamp}.png"
-
-    # print("Number of predictions:", len(all_preds))
-    # print("Unique predictions:", np.unique(all_preds, return_counts=True))
-    # print("Unique labels:", np.unique(all_labels, return_counts=True))
     
     cm = confusion_matrix(all_labels, all_preds, labels=[0, 1])
     print("Confusion Matrix:\n", cm)

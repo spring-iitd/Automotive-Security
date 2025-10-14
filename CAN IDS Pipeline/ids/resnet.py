@@ -27,7 +27,6 @@ class ResNet(IDS):
  
 
     def train(self, X_train=None, Y_train=None, **kwargs):
-        
 
         # Load the test and train datasets from multiple folders
         dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
@@ -37,7 +36,6 @@ class ResNet(IDS):
         print("Loaded train dataset")
     
         epochs = EPOCHS   # default
-
         # Train the model
         model = self.train_wisa(self.model, self.device, train_loader, self.optimizer, self.criterion, epochs)
 
@@ -45,8 +43,6 @@ class ResNet(IDS):
  
     def test(self, X_test=None, Y_test=None, **kwargs):
         print("Entered model's testing method")
-        
-
         dataset_path = os.path.join(DIR_PATH, "..", "datasets", DATASET_NAME)
         test_dataset_dir = os.path.join(dataset_path, "test", TEST_DATASET_DIR)
         
@@ -181,13 +177,9 @@ class ResNet(IDS):
     
         # Print overall training loss and accuracy for the epoch
         overall_accuracy = 100. * correct / len(train_loader.dataset)
-        
-    
         return model
     
     def test_wisa(self, model, device, test_loader, criterion):
-    
-        # model.load_state_dict(torch.load(model_path,map_location=torch.device('cpu'), weights_only='True'))
         model.eval()
         test_loss = 0
         correct = 0

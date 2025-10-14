@@ -29,11 +29,7 @@ def calculate_interframe_bits_new(frame, timestamp_difference, data_rate, i):
     # Calculating the duration of the frame in seconds
     frame_duration = length_of_frame / data_rate
 
-    # Calculating the interframe time (time gap between current and previous frames)
-    # interframe_time = timestamp_difference - frame_duration
-
     interframe_bits = round(timestamp_difference * data_rate)
-    # print("idle time length",interframe_bits)
     return '2' * interframe_bits
 
 
@@ -85,8 +81,6 @@ def image_generation(binary_matrix, y1, valid_images, base_output_folder,label_f
             # Saving the resulting image in the base output folder
             output_path = os.path.join(base_output_folder, filename)
             img.save(output_path)
-
-            # print("Image{} saved".format(count))
 
             # Write the label to the truth labels file
             label_file.write(f'{filename}: {valid_images[idx]}, {y1[idx]}\n')

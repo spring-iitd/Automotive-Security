@@ -110,12 +110,8 @@ def convert_to_binary_string(can_id, dlc, data):
     else:
         data_bits = ''
     
-    # print(data_bits)
     # Filling missing data bytes with zeros
     padding_bits = '0' * (8 * (8 - dlc))
-
-    # data_bit_total = data_bits + padding_bits
-    # data_bit_total = padding_bits + data_bits 
     data_bit_total = data_bits
  
     # Calculating CRC-15 checksum and converting to binary representation
@@ -233,15 +229,11 @@ def form_data(input_filename):
 
     # Initialising empty lists and variables
 
-    #frame count
-    # fc = 1
-
     # List to store timestamp and converted binary data
     data_array = []
 
     # List to store frame types : attack/benign
     frame_type = []
-
 
     # Open the input file for reading
     with open(input_filename, 'r') as input_file:

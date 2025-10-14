@@ -7,7 +7,7 @@ from .base import BaseSplitter
 
 
 
-class ThreeWaySplitter(BaseSplitter):
+class ThreeWay(BaseSplitter):
     def __init__(self, input_dir, feature_extractor):
         super().__init__(input_dir)
         self.feature_extractor = feature_extractor

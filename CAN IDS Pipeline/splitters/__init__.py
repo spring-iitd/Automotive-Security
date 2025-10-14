@@ -1,15 +1,20 @@
-from .default import DefaultSplitter
-from .threeway import ThreeWaySplitter
-from config import *
-SPLIT_REGISTRY = {
-    "default": DefaultSplitter,
-    "three": ThreeWaySplitter,
-}
+import os
+import importlib
+import inspect
 
-def get_splitter(input_dir, mode, feature_extractor="PixNet", **kwargs):
-    if not SPLIT: 
-        return None
-    splitter_cls = SPLIT_REGISTRY.get(mode)
-    if splitter_cls is None:
-        raise ValueError(f"Unknown split mode: {mode}")
-    return splitter_cls(input_dir, feature_extractor, **kwargs).split()
+__all__ = []           
+__all_classes__ = []   
+
+package_name = __name__
+current_dir = os.path.dirname(__file__)
+
+for filename in os.listdir(current_dir):
+    if filename.endswith('.py') and not filename.startswith('_') and filename != '__init__.py':
+        module_name = filename[:-3]
+        module = importlib.import_module(f'.{module_name}', package_name)
+
+        for name, obj in inspect.getmembers(module, inspect.isclass):
+            if obj.__module__ == f'{package_name}.{module_name}':
+                globals()[name] = obj             
+                __all__.append(name)              
+                __all_classes__.append(obj)       

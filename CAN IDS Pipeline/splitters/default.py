@@ -5,7 +5,7 @@ import os
 import re
 import shutil
 
-class DefaultSplitter(BaseSplitter):
+class Default(BaseSplitter):
     def __init__(self, input_dir, feature_extractor):
         super().__init__(input_dir)
         self.split_ratio = SPLIT_RATIO
@@ -15,6 +15,24 @@ class DefaultSplitter(BaseSplitter):
 
     def split(self):
         split_and_store_data()
+        # train_dir = os.path.join(self.input_dir, "train", TRAIN_DATASET_DIR)  
+        # test_dir = os.path.join(self.input_dir, "test", TEST_DATASET_DIR)
+        # input_directory = os.path.join(self.input_dir, "features", "Images", FILE_NAME[:-4]+"_images")
+
+        # self.sequential_split_images(input_directory, train_dir, test_dir, self.split_ratio)
+
+        # if self.feature_extractor == "PixNet":
+        #     label_file = os.path.join(input_directory, "labels.txt")
+        #     train_images = sorted(self.extract_files(train_dir), key=self.extract_number)
+        #     test_images = sorted(self.extract_files(test_dir), key=self.extract_number)
+        #     self.split_labels(label_file, train_images, test_images,
+        #                  os.path.join(train_dir, "train_label_file.txt"),
+        #                  os.path.join(test_dir, "test_label_file.txt"))
+
+        #     csv_file = os.path.join(self.input_dir, "csv_files",  FILE_NAME[:-4]+"_track.csv")
+        #     self.split_track_csv(csv_file, train_images, test_images,
+        #                     os.path.join(train_dir, "track_csv_train.csv"),
+        #                     os.path.join(test_dir, "track_csv_test.csv"))
             
     
 def extract_number(filename):
@@ -36,12 +54,15 @@ def sequential_split_images(src_folder, train_folder, test_folder, split_ratio=0
 
     # List images and sort them (sequential order)
     images = extract_files(src_folder)
+    # images = sorted(os.listdir(src_folder))
+    # images = sorted(images, key=lambda x: int(''.join(filter(str.isdigit, x)) or -1))
 
     total = len(images)
     split_index = total - int(total * split_ratio)
 
 
     sorted_images = sorted(images, key=extract_number)
+    # print("Images: ", sorted_images)
 
     # Train = first split_index images
     train_images = sorted_images[:split_index]
@@ -53,6 +74,9 @@ def sequential_split_images(src_folder, train_folder, test_folder, split_ratio=0
 
     for img in test_images:
         shutil.copy(os.path.join(src_folder, img), os.path.join(test_folder, img))
+
+    # print(f"Train images: {len(train_images)}")
+    # print(f"Test images: {len(test_images)}")
 
 
 
@@ -76,6 +100,9 @@ def split_labels(label_file, train_images, test_images, train_label_file, test_l
         for img in test_images:
             if img in labels:
                 f.write(f"{img}: {labels[img]}\n")
+
+    # print(f"Train labels saved to {train_label_file}")
+    # print(f"Test labels saved to {test_label_file}")
 
 
 
@@ -124,6 +151,8 @@ def split_and_store_data():
         train_label_file = os.path.join(train_dir, "labels.txt")
         test_label_file = os.path.join(test_dir, "labels.txt")
         split_labels(label_file, train_images, test_images, train_label_file, test_label_file)
+        # print("Train images : ", train_images)
+        # print("Test images : ", test_images)
         csv_file = os.path.join(input_dir, "csv_files",  FILE_NAME[:-4]+"_track.csv")
         train_track_csv_file = os.path.join(train_dir, "track.csv")
         test_track_csv_file = os.path.join(test_dir, "track.csv")

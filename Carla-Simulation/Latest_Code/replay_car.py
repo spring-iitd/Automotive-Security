@@ -642,11 +642,13 @@ def replay_dos_data_two_car():
     # car_model_list = get_actor_blueprints(self.world, self._actor_filter, self._actor_generation)
     # car_model = car_model_list[2]
     blueprint = world.get_blueprint_library().filter('vehicle.tesla.model3')[0]
+    blueprint.set_attribute('color', '0,0,255')
     source = spawn_points[11]
     vehicle_2 = world.try_spawn_actor(blueprint, source)
     # modify_vehicle_physics(vehicle_2)
     world.wait_for_tick()
     source.location.y -= 25
+    blueprint.set_attribute('color', '255,0,0')
     vehicle_1 = world.try_spawn_actor(blueprint, source)
     # modify_vehicle_physics(vehicle_1)
     world.wait_for_tick()
@@ -682,13 +684,15 @@ def replay_dos_data_two_car():
     timestamp_reader = open('./Logs_25.5_1/gen_vehicle_control_time.log', 'r')
     
     # Initialize lists to store data
-    vehicle_control_obj_1, queue_170, queue_202, queue_18F, control_timestamps  = convert_can_to_control_data('./Logs_25.5_1/can_data_logs.log')
+    stored_control_obj_1, queue_170, queue_202, queue_18F, control_timestamps  = convert_can_to_control_data('./Logs_25.5_1/can_data_logs.log')
     # vehicle_control_obj_1 = extract_control_data('./Logs_25.5_1/gen_control_obj_1.log')
-    vehicle_control_obj_2 = extract_control_data('./Logs_25.5_1/gen_control_obj_2.log')
+    # vehicle_control_obj_2 = extract_control_data('./Logs_25.5_1/gen_control_obj_2.log')
     timestamps = []
     vehicle_location_1 = []
     vehicle_location_2 = []
     dos_timestamp = []
+    vehicle_control_obj_1 = []
+    vehicle_control_obj_2 = []
 
     # Read timestamps from the generated log file
     gen_timestamps = [float(line.strip()) for line in timestamp_reader if line.strip()]
@@ -700,7 +704,7 @@ def replay_dos_data_two_car():
 
     time_diff_tick = 0.006
 
-    sim_time_sec = 36 #Duration of simulation in seconds
+    sim_time_sec = 120 #Duration of simulation in seconds
     total_iterations = int(sim_time_sec / time_diff_tick)
 
     jitter_array = read_jitter_array('./Logs_25.5_1/jitter_array.log') 
@@ -715,7 +719,7 @@ def replay_dos_data_two_car():
     start_time = timeit.default_timer()
     can_handler.start_frame()
     try:
-        for i in range(len(vehicle_control_obj_1)):  
+        for i in range(len(stored_control_obj_1)):  
 
             # Get current time
             # current_time = timeit.default_timer() - start_time
@@ -754,12 +758,12 @@ def replay_dos_data_two_car():
                             queue_170, queue_202, queue_18F
                         )
 
-                    # vehicle_control_obj_1.append(control)
+                    vehicle_control_obj_1.append(control)
 
                 count_dos = 0
 
             # # Get current control state
-            control_1 = vehicle_control_obj_1[i]
+            control_1 = stored_control_obj_1[i]
             control_2 = agent_2.run_step()
 
             current_location_1 = vehicle_1.get_location()
@@ -813,12 +817,12 @@ def replay_dos_data_two_car():
                         queue_170, queue_202, queue_18F
                     )
                 
-                # vehicle_control_obj_1.append(control_1)
+                vehicle_control_obj_1.append(control_1)
            
             # print(speed)
 
             #Log Vehicle Control Data  
-            # vehicle_control_obj_2.append(control_2)
+            vehicle_control_obj_2.append(control_2)
 
             # Logging vehicle location data
             vehicle_location_1.append(current_location_1)
@@ -1151,4 +1155,4 @@ def replay_spoof_data_two_car():
 if __name__ == '__main__':
     print("Starting generation...")
     # replay_dos_data_two_car()
-    replay_spoof_data_two_car()
+    replay_dos_data_two_car()

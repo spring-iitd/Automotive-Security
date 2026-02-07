@@ -460,7 +460,8 @@ def generate_spoof_data_two_car():
                 # Apply the spoofed control to the first vehicle in the current tick
                 count = 0
                 control = carla.VehicleControl(throttle=control_1.throttle, steer=-1.0, brake=control_1.brake, gear=0)
-                while count < 1:
+                #keep count as 1, even if you increase the count, the effect will not be reflected in simulation. (override the prev msg if sent immediately after first message)
+                while count < 1:                    
                     current_timestamp = timeit.default_timer()-start_time
                     spoof_timestamp.append(current_timestamp)
 

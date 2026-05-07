@@ -1,0 +1,25 @@
+run_steps:
+  attack: True
+  decode: True
+  evaluate: True
+  update: True
+
+
+attack:
+  original_test_dir: "gear_test_images"
+  original_label_file: "gear_test_images/labels.txt"
+  original_tracksheet: "tracksheets_CH/gear_test_track_original.csv"
+  surrogate_model: "Trained_models/densenet161_surrogate_gear.pth"
+  output_dir: "perturbed_images_spoof_CH"
+  benign_csv: "CAN_DATA/gear_test.csv"
+  ablation_frac: 0.25
+
+decode:
+  decoded_output_dir: "decoded_traffic_spoof_CH"
+
+evaluate:
+  model_path: "Trained_models/Densenet161_car_hacking_spoof_withdata.pt"
+  prediction_output_dir: "prediction_output_spoof_CH"
+
+update:
+  tracksheet_dir: "tracksheets_CH"
